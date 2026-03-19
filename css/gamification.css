@@ -400,3 +400,11 @@ body {
     bottom: 8px;
     right: 8px;
 }
+
+/* Snake Game Styles */
+#snake-canvas {
+    background-color: #0f172a;
+    border: 2px solid #334155;
+    box-shadow: 0 0 20px rgba(0,0,0,0.5);
+    border-radius: 8px;
+}

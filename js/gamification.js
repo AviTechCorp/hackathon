@@ -22,6 +22,7 @@ let currentConfig = {
     type: '',
     topic: ''
 };
+let currentUserProfile = null;
 
 document.addEventListener('DOMContentLoaded', () => {
     // Logout Handler
@@ -62,6 +63,12 @@ document.addEventListener('DOMContentLoaded', () => {
     // Form Submit
     document.getElementById('game-setup-form').addEventListener('submit', handleConfigSubmit);
 
+    // Initialize MathGames API (The Professional Way)
+    if (window.MathGames) {
+        // Note: Use a valid production key when deploying
+        window.MathGames.init({ apiKey: 'DEMO-ACCESS-KEY-2026' });
+    }
+
     // Auth & Data Loading
     auth.onAuthStateChanged(async (user) => {
         if (user) {
@@ -91,6 +98,7 @@ async function loadUserProfile(uid) {
         } else {
             userData = userDoc.data();
         }
+        currentUserProfile = userData;
 
         // Update Stats
         levelDisplay.textContent = userData.level || 1;
@@ -181,7 +189,7 @@ function handleConfigSubmit(e) {
     // Store configuration
     currentConfig.educationLevel = document.getElementById('education-level').options[document.getElementById('education-level').selectedIndex].text;
     currentConfig.type = document.getElementById('game-type').value;
-    currentConfig.topic = document.getElementById('game-topic').value;
+    currentConfig.topic = document.getElementById('game-topic').value.trim() || "General Knowledge";
 
     renderLevels();
     switchView('view-levels');
@@ -190,12 +198,13 @@ function handleConfigSubmit(e) {
 function renderLevels() {
     const grid = document.getElementById('levels-grid');
     grid.innerHTML = '';
+    const maxUnlocked = currentUserProfile ? (currentUserProfile.level || 1) : 1;
 
     // Generate 12 Levels
     for (let i = 1; i <= 12; i++) {
         const btn = document.createElement('div');
-        // Logic: First 3 levels unlocked, others locked
-        const isLocked = i > 3; 
+        // Logic: Unlock based on user profile
+        const isLocked = i > maxUnlocked; 
 
         btn.className = `level-card ${isLocked ? 'locked' : ''}`;
         btn.innerHTML = `${i} ${isLocked ? '<span class="lock-icon">🔒</span>' : ''}`;
@@ -205,6 +214,24 @@ function renderLevels() {
         }
         
         grid.appendChild(btn);
+    }
+}
+
+async function unlockNextLevel(completedLevel) {
+    if (!currentUserProfile || !auth.currentUser) return;
+
+    // If the user just completed their current highest level, unlock the next one
+    if (completedLevel === (currentUserProfile.level || 1)) {
+        const newLevel = completedLevel + 1;
+        try {
+            await db.collection('users').doc(auth.currentUser.uid).update({
+                level: newLevel
+            });
+            currentUserProfile.level = newLevel;
+            document.getElementById('level-display').textContent = newLevel;
+        } catch (error) {
+            console.error("Error unlocking level:", error);
+        }
     }
 }
 
@@ -227,12 +254,22 @@ async function startGame(gameLevel) {
     
     container.innerHTML = ''; 
 
+    // 1.5. Check for Minigames (Snake)
+    if (currentConfig.type === 'Snake') {
+        startSnakeGame(container, currentConfig.educationLevel, currentConfig.topic, gameLevel, selectedSubject);
+        return;
+    }
+
     // 2. Dispatch Game based on Subject
     const subj = selectedSubject.id;
 
     if (['math', 'acc', 'compsci', 'eng'].includes(subj)) {
         // Numerical & Logic Games
-        if (currentConfig.type === 'Puzzle') {
+        // Check if topic is suitable for Number Line (Integers/Arithmetic)
+        const t = currentConfig.topic.toLowerCase();
+        const isIntegerTopic = !t.includes('fraction') && !t.includes('geo') && !t.includes('trig') && !t.includes('calc') && !t.includes('percent') && !t.includes('power') && !t.includes('exponent') && !t.includes('finance');
+        
+        if ((currentConfig.type === 'Puzzle' || currentConfig.type === 'Simulation') && isIntegerTopic) {
             startNumberLineGame(container, currentConfig.educationLevel, currentConfig.topic, gameLevel);
         } else {
             startMathGame(container, currentConfig.educationLevel, currentConfig.topic, currentConfig.type, gameLevel, selectedSubject.title, contentData);
@@ -473,6 +510,373 @@ function startRegexGame(container, topic) {
     });
 }
 
+/* Snake Game Implementation */
+function startSnakeGame(container, levelText, topic, gameLevel, subject) {
+    // Setup Canvas
+    container.innerHTML = `
+        <div style="text-align:center; color:white;">
+            <div style="display:flex; justify-content:space-between; width:400px; margin:0 auto 5px auto;">
+                <span style="color:#4ade80; font-weight:bold;">Level ${gameLevel}</span>
+                <span id="snake-score">Score: 0</span>
+                <span id="snake-lives" style="font-size:1.1rem;">❤️❤️❤️</span>
+            </div>
+            
+            <div style="display:flex; justify-content:center; gap:10px; margin-bottom:10px;">
+                <select id="snake-speed" style="color:black; padding:4px; border-radius:4px; cursor:pointer;">
+                    <option value="350">Slow</option>
+                    <option value="200" selected>Normal</option>
+                    <option value="150">Fast</option>
+                </select>
+                <button id="snake-pause" class="play-btn" style="width:auto; padding:4px 12px; font-size:0.9rem;">Pause</button>
+            </div>
+
+            <div id="snake-mission" style="color:#fbbf24; font-weight:bold; font-size: 0.9rem; margin-bottom:5px; height:20px;">Loading...</div>
+
+            <div style="position:relative; width:400px; height:400px; margin:0 auto;">
+                <canvas id="snake-canvas" width="400" height="400"></canvas>
+                <!-- Summary Overlay -->
+                <div id="snake-summary" class="hidden" style="position:absolute; top:0; left:0; width:100%; height:100%; background:rgba(15, 23, 42, 0.95); padding:20px; box-sizing:border-box; border-radius:8px; display:flex; flex-direction:column; align-items:center; justify-content:center; z-index:10; color:white;">
+                </div>
+            </div>
+
+            <p style="color:#64748b; font-size:0.9rem; margin-top:5px;">Use Arrow Keys. Eat the <strong>correct</strong> items!</p>
+            <div style="margin-top:5px;">
+                <button id="snake-restart" class="play-btn hidden" style="width:auto; margin-right: 10px;">Play Again</button>
+                <button id="snake-next-level" class="play-btn hidden" style="width:auto; background-color: #4ade80; color: #0f172a;">Next Level ➡</button>
+            </div>
+        </div>
+    `;
+
+    const canvas = document.getElementById('snake-canvas');
+    const ctx = canvas.getContext('2d');
+    const scoreEl = document.getElementById('snake-score');
+    const missionEl = document.getElementById('snake-mission');
+    const summaryEl = document.getElementById('snake-summary');
+    const livesEl = document.getElementById('snake-lives');
+    const restartBtn = document.getElementById('snake-restart');
+    const speedSelect = document.getElementById('snake-speed');
+    const pauseBtn = document.getElementById('snake-pause');
+    const nextLevelBtn = document.getElementById('snake-next-level');
+
+    // Game Config
+    const gridSize = 25; // Larger grid for text
+    const tileCount = canvas.width / gridSize;
+    let speed = parseInt(speedSelect.value);
+    let isPaused = false;
+    const winningScore = 100; // Ending point
+    const maxLives = 3;
+    let lives = maxLives;
+    
+    let score = 0;
+    let velocity = { x: 0, y: 0 };
+    let trail = [];
+    let tail = 5;
+    
+    let player = { x: 10, y: 10 };
+    let foods = []; // Array of {x, y, value, isCorrect}
+    let itemsEatenInRound = 0;
+    let isGameOver = false;
+
+    // Stats Tracking
+    let sessionStats = { correct: [], incorrect: [], rule: "" };
+
+    // Controls Listeners
+    speedSelect.addEventListener('change', (e) => speed = parseInt(e.target.value));
+    pauseBtn.addEventListener('click', () => {
+        isPaused = !isPaused;
+        pauseBtn.textContent = isPaused ? "Resume" : "Pause";
+        if (!isPaused) gameLoop();
+    });
+    nextLevelBtn.addEventListener('click', () => startGame(gameLevel + 1));
+
+    function updateLivesUI() {
+        let hearts = "";
+        for(let i=0; i<lives; i++) hearts += "❤️";
+        for(let i=lives; i<maxLives; i++) hearts += "🖤";
+        livesEl.textContent = hearts;
+    }
+
+    // --- Content Generation Logic ---
+    function spawnRound() {
+        foods = [];
+        itemsEatenInRound = 0;
+        let correctPool = [];
+        let wrongPool = [];
+        let ruleText = "";
+
+        // Determine Content based on Subject
+        if (['math', 'acc', 'compsci', 'eng'].includes(subject.id)) {
+            // Math Logic
+            const mode = Math.random();
+            if (mode < 0.33) {
+                const base = Math.floor(Math.random() * 8) + 2;
+                ruleText = `Eat Multiples of ${base}`;
+                for(let i=0; i<5; i++) correctPool.push(base * (Math.floor(Math.random()*9)+1));
+                for(let i=0; i<5; i++) wrongPool.push((base * (Math.floor(Math.random()*9)+1)) + (Math.random()>0.5?1:-1));
+            } else if (mode < 0.66) {
+                const threshold = Math.floor(Math.random() * 20) + 5;
+                const isGreater = Math.random() > 0.5;
+                ruleText = isGreater ? `Eat Numbers > ${threshold}` : `Eat Numbers < ${threshold}`;
+                for(let i=0; i<5; i++) correctPool.push(isGreater ? threshold + Math.floor(Math.random()*10)+1 : threshold - Math.floor(Math.random()*10)-1);
+                for(let i=0; i<5; i++) wrongPool.push(isGreater ? threshold - Math.floor(Math.random()*10) : threshold + Math.floor(Math.random()*10));
+            } else {
+                const isEven = Math.random() > 0.5;
+                ruleText = isEven ? "Eat Even Numbers" : "Eat Odd Numbers";
+                for(let i=0; i<5; i++) correctPool.push(isEven ? (Math.floor(Math.random()*20)*2) : (Math.floor(Math.random()*20)*2)+1);
+                for(let i=0; i<5; i++) wrongPool.push(isEven ? (Math.floor(Math.random()*20)*2)+1 : (Math.floor(Math.random()*20)*2));
+            }
+        } else {
+            // Text Logic (Letters)
+            const cleanTopic = topic.toUpperCase().replace(/[^A-Z]/g, '') || "SCHOOL";
+            const isTopicMode = Math.random() > 0.5 && cleanTopic.length > 2;
+            
+            if (isTopicMode) {
+                ruleText = `Eat letters in "${cleanTopic.substring(0, 6)}..."`;
+                const targets = cleanTopic.split('');
+                const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split('');
+                for(let i=0; i<5; i++) correctPool.push(targets[Math.floor(Math.random()*targets.length)]);
+                for(let i=0; i<5; i++) wrongPool.push(alphabet.filter(c => !targets.includes(c))[Math.floor(Math.random()*20)]);
+            } else {
+                const isVowel = Math.random() > 0.5;
+                ruleText = isVowel ? "Eat Vowels" : "Eat Consonants";
+                const vowels = ['A','E','I','O','U'];
+                const consonants = "BCDFGHJKLMNPQRSTVWXYZ".split('');
+                for(let i=0; i<5; i++) correctPool.push(isVowel ? vowels[Math.floor(Math.random()*5)] : consonants[Math.floor(Math.random()*21)]);
+                for(let i=0; i<5; i++) wrongPool.push(isVowel ? consonants[Math.floor(Math.random()*21)] : vowels[Math.floor(Math.random()*5)]);
+            }
+        }
+
+        missionEl.textContent = ruleText;
+        sessionStats.rule = ruleText;
+        // Spawn initial items (1 correct, 2 wrong)
+        spawnItem(correctPool, true);
+        spawnItem(wrongPool, false);
+        spawnItem(wrongPool, false);
+
+        return { correctPool, wrongPool };
+    }
+
+    let currentPools = {}; 
+
+    function spawnItem(pool, isCorrect) {
+        let valid = false;
+        while (!valid) {
+            const x = Math.floor(Math.random() * tileCount);
+            const y = Math.floor(Math.random() * tileCount);
+            // Check overlap with snake or other foods
+            const overlap = trail.some(t => t.x === x && t.y === y) || foods.some(f => f.x === x && f.y === y);
+            if (!overlap) {
+                foods.push({ x, y, value: pool[Math.floor(Math.random() * pool.length)], isCorrect });
+                valid = true;
+            }
+        }
+    }
+
+    function gameLoop() {
+        // Stop if view changed
+        if (document.getElementById('view-game').classList.contains('hidden')) {
+            return;
+        }
+        if (isPaused) return;
+
+        player.x += velocity.x;
+        player.y += velocity.y;
+
+        // Wrap walls
+        if (player.x < 0) player.x = tileCount - 1;
+        if (player.x > tileCount - 1) player.x = 0;
+        if (player.y < 0) player.y = tileCount - 1;
+        if (player.y > tileCount - 1) player.y = 0;
+
+        // Background
+        ctx.fillStyle = '#0f172a';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        // Snake
+        ctx.fillStyle = '#4ade80'; // Green
+        for (let i = 0; i < trail.length; i++) {
+            ctx.fillRect(trail[i].x * gridSize, trail[i].y * gridSize, gridSize - 2, gridSize - 2);
+            
+            // Self collision check (only if moving)
+            if ((velocity.x !== 0 || velocity.y !== 0) && trail[i].x === player.x && trail[i].y === player.y) {
+                finishGame(false);
+                return;
+            }
+        }
+
+        trail.push({ x: player.x, y: player.y });
+        while (trail.length > tail) {
+            trail.shift();
+        }
+
+        // Draw Foods (Numbers/Letters)
+        ctx.font = "bold 14px Inter";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+
+        foods.forEach((food, index) => {
+            // Draw Orb Background
+            ctx.fillStyle = '#3b82f6'; // Blue orb
+            ctx.beginPath();
+            ctx.arc((food.x * gridSize) + gridSize/2, (food.y * gridSize) + gridSize/2, gridSize/2 - 2, 0, 2 * Math.PI);
+            ctx.fill();
+
+            // Draw Text
+            ctx.fillStyle = '#ffffff';
+            ctx.fillText(food.value, (food.x * gridSize) + gridSize/2, (food.y * gridSize) + gridSize/2 + 1);
+
+            // Collision with Head
+            if (food.x === player.x && food.y === player.y) {
+                if (food.isCorrect) {
+                    // Correct Eat
+                    tail++;
+                    score += 10;
+                    scoreEl.textContent = `Score: ${score}`;
+                    itemsEatenInRound++;
+                    sessionStats.correct.push(food.value);
+                    
+                    // Check Win Condition (Ending Point)
+                    if (score >= winningScore) {
+                        finishGame(true);
+                        return;
+                    }
+
+                    // Remove eaten
+                    foods.splice(index, 1);
+
+                    // Progression: Change rule every 3 correct items
+                    if (itemsEatenInRound >= 3) {
+                        currentPools = spawnRound();
+                    } else {
+                        // Respawn 1 correct, 1 wrong to keep density
+                        spawnItem(currentPools.correctPool, true);
+                        spawnItem(currentPools.wrongPool, false);
+                    }
+                } else {
+                    // Wrong Eat - Lose Life but continue
+                    lives--;
+                    updateLivesUI();
+                    sessionStats.incorrect.push(food.value);
+                    foods.splice(index, 1);
+                    spawnItem(currentPools.wrongPool, false); // Respawn to keep board full
+                    
+                    if (lives <= 0) {
+                        finishGame(false);
+                    }
+                    return;
+                }
+            }
+        });
+
+        // Spawn items if empty (failsafe)
+        if (foods.length === 0 && currentPools.correctPool) {
+             spawnItem(currentPools.correctPool, true);
+        }
+
+        if (!isGameOver) {
+            setTimeout(() => requestAnimationFrame(gameLoop), speed);
+        }
+    }
+
+    function finishGame(isWin) {
+        isGameOver = true;
+        
+        const correctPoints = sessionStats.correct.length * 10;
+        const wrongPoints = sessionStats.incorrect.length * 10;
+        const accuracy = Math.max(0, correctPoints - wrongPoints);
+        const isPass = accuracy > 50;
+
+        // Generate Feedback Summary HTML
+        let html = `<h2 style="color:${isPass ? '#4ade80' : '#f87171'}; margin-bottom:0.5rem;">
+            ${isPass ? 'Level Complete!' : 'Game Over'}
+        </h2>`;
+        
+        html += `<div style="font-size:1.2rem; margin-bottom:1rem;">Grade: <strong style="color:${accuracy >= 50 ? '#4ade80' : '#f87171'}">${accuracy}%</strong></div>`;
+        
+        if (sessionStats.incorrect.length > 0) {
+            html += `<div style="text-align:left; width:100%; font-size:0.9rem; color:#cbd5e1; background:#1e293b; padding:10px; border-radius:6px; margin-bottom:10px;">`;
+            html += `<p style="margin:5px 0;">❌ <strong>Mistake:</strong> You ate <span style="color:#f87171; font-weight:bold;">${sessionStats.incorrect[0]}</span></p>`;
+            html += `<p style="margin:5px 0;">⚠️ <strong>Rule:</strong> ${sessionStats.rule}</p>`;
+            html += `</div>`;
+            
+            html += `<div style="background:#334155; padding:10px; border-radius:6px; width:100%; text-align:left; font-size:0.9rem;">`;
+            html += `<strong style="color:#fbbf24;">Study Tip:</strong><br>`;
+            html += `Review the topic "<em>${sessionStats.rule.replace('Eat ', '')}</em>". You need to improve distinguishing these values.`;
+            html += `</div>`;
+        } else if (!isWin) {
+            html += `<p>You crashed into a wall! Be careful navigating.</p>`;
+        } else {
+            html += `<p style="color:#4ade80">Perfect run! No mistakes made.</p>`;
+        }
+        
+        html += `<div style="display:flex; justify-content:space-around; width:100%; margin-top:10px; font-size:0.9rem; color:#94a3b8;">
+            <span>Correct: <strong style="color:#4ade80">${sessionStats.correct.length}</strong></span>
+            <span>Wrong: <strong style="color:#f87171">${sessionStats.incorrect.length}</strong></span>
+        </div>`;
+        html += `<p style="margin-top:1rem; font-size:1.2rem; font-weight:bold; color:white;">Final Score: ${score}</p>`;
+
+        summaryEl.innerHTML = html;
+        summaryEl.classList.remove('hidden');
+        restartBtn.classList.remove('hidden');
+        
+        if (isPass) {
+            nextLevelBtn.textContent = `Play Level ${gameLevel + 1} ➡`;
+            nextLevelBtn.classList.remove('hidden');
+            unlockNextLevel(gameLevel);
+        }
+    }
+
+    function handleInput(e) {
+        // Toggle Pause with Spacebar
+        if (e.key === ' ' || e.code === 'Space') {
+            e.preventDefault();
+            isPaused = !isPaused;
+            pauseBtn.textContent = isPaused ? "Resume" : "Pause";
+            if (!isPaused) gameLoop();
+            return;
+        }
+
+        if (isPaused) return;
+
+        switch (e.key) {
+            case 'ArrowLeft': if (velocity.x !== 1) { velocity.x = -1; velocity.y = 0; } break;
+            case 'ArrowUp': if (velocity.y !== 1) { velocity.x = 0; velocity.y = -1; } break;
+            case 'ArrowRight': if (velocity.x !== -1) { velocity.x = 1; velocity.y = 0; } break;
+            case 'ArrowDown': if (velocity.y !== -1) { velocity.x = 0; velocity.y = 1; } break;
+        }
+    }
+
+    document.addEventListener('keydown', handleInput);
+
+    restartBtn.addEventListener('click', () => {
+        // Reset
+        score = 0;
+        scoreEl.textContent = `Score: ${score}`;
+        tail = 5;
+        player = { x: 10, y: 10 };
+        velocity = { x: 0, y: 0 }; // Pause at start
+        trail = [];
+        isGameOver = false;
+        isPaused = false;
+        pauseBtn.textContent = "Pause";
+        
+        restartBtn.classList.add('hidden');
+        nextLevelBtn.classList.add('hidden');
+        summaryEl.classList.add('hidden');
+        
+        // Init Data
+        sessionStats = { correct: [], incorrect: [], rule: "" };
+        lives = maxLives;
+        updateLivesUI();
+        currentPools = spawnRound();
+        gameLoop();
+    });
+
+    // Init First Round
+    currentPools = spawnRound();
+    gameLoop(); // Start Loop
+}
+
 /* Number Line Game Implementation */
 function startNumberLineGame(container, levelText, topic, gameLevel) {
     // Determine Range based on Grade
@@ -648,6 +1052,7 @@ function startNumberLineGame(container, levelText, topic, gameLevel) {
 /* Renamed: Generic Math Game */
 function startMathGame(container, levelText, topic, gameType, gameLevel, subjectTitle, contentData) {
     const tier = getTier(levelText);
+    const isSimulation = (gameType === 'Simulation' || gameType === 'Puzzle');
     
     // Calc Range
     let range = 10;
@@ -657,7 +1062,7 @@ function startMathGame(container, levelText, topic, gameType, gameLevel, subject
 
     range += (gameLevel * 5);
 
-    let timeLeft = 45;
+    let timeLeft = isSimulation ? null : 45;
     let score = 0;
     let timerInterval;
     let currentQuestion = null;
@@ -665,17 +1070,21 @@ function startMathGame(container, levelText, topic, gameType, gameLevel, subject
     // Build Game UI
     container.innerHTML = `
         <div class="game-ui" style="text-align:center; width: 100%; max-width: 400px; font-family: 'Inter', sans-serif;">
+            <div style="color: #64748b; font-size: 0.9rem; margin-bottom: 0.5rem; font-weight:bold;">Level ${gameLevel}</div>
             <div style="display:flex; justify-content:space-between; margin-bottom:1rem; font-size:1.2rem; color: #cbd5e1;">
-                <span id="game-timer-display">⏱️ ${timeLeft}s</span>
+                <span id="game-timer-display">${isSimulation ? '∞ Practice' : '⏱️ ' + timeLeft + 's'}</span>
                 <span id="game-score-display">⭐ ${score}</span>
             </div>
             
             <h3 style="color: #94a3b8; margin:0;">
-                ${tier === 'foundation' ? 'Number Sense' : 
+                ${isSimulation ? 'Simulation Mode' : 
+                  tier === 'foundation' ? 'Number Sense' : 
                   tier === 'highschool' ? 'Functions & Algebra' : 
                   tier === 'tertiary' ? 'Logic & Computation' : 'Mental Math Fluency'}
             </h3>
             <p style="font-size:0.9rem; color:#64748b;">${topic}</p>
+            
+            <div id="math-visual" style="margin: 1rem auto; min-height: 20px; display:flex; justify-content:center; align-items:center;"></div>
             
             <div id="math-problem" style="font-size:3.5rem; font-weight:bold; margin: 2rem 0; font-family: monospace;">
                 Ready?
@@ -689,7 +1098,10 @@ function startMathGame(container, levelText, topic, gameType, gameLevel, subject
 
             <div id="math-feedback" style="height:20px; margin-top:1rem; font-weight:bold;"></div>
             
-            <button id="math-restart" class="play-btn hidden" style="margin-top:1rem; background-color: var(--gold); color: black;">Play Again</button>
+            <div style="margin-top:1rem;">
+                <button id="math-restart" class="play-btn hidden" style="width:auto; background-color: var(--gold); color: black; margin-right:10px;">Play Again</button>
+                <button id="math-next-level" class="play-btn hidden" style="width:auto; background-color: #4ade80; color: black;">Next Level ➡</button>
+            </div>
         </div>
     `;
 
@@ -700,11 +1112,39 @@ function startMathGame(container, levelText, topic, gameType, gameLevel, subject
     const timerDisplay = container.querySelector('#game-timer-display');
     const scoreDisplay = container.querySelector('#game-score-display');
     const restartBtn = container.querySelector('#math-restart');
+    const nextLevelBtn = container.querySelector('#math-next-level');
+    const visualContainer = container.querySelector('#math-visual');
 
-    function generateProblem() {
-        const t = topic.toLowerCase();
+    async function generateProblem() {
         input.value = '';
         input.focus();
+
+        // --- MathGames API Integration ---
+        if (gameType === 'MathGames' && window.MathGames) {
+            try {
+                // Map topic to skill
+                const skillMap = { 'fraction': 'fractions', 'geo': 'geometry', 'algebra': 'algebra', 'trig': 'trigonometry' };
+                const skillKey = Object.keys(skillMap).find(k => topic.toLowerCase().includes(k)) || 'arithmetic';
+                
+                await window.MathGames.selectSkill(skillMap[skillKey] || 'arithmetic');
+                const apiQ = await window.MathGames.getQuestion(gameLevel);
+                
+                if (apiQ && apiQ.question) {
+                    currentQuestion = { answer: apiQ.answer, text: apiQ.question, type: 'numeric' };
+                    problemDisplay.textContent = currentQuestion.text;
+                    return;
+                } else {
+                    // Fallback to internal engine if API returns no data
+                    console.warn("MathGames API returned no question. Switching to internal engine.");
+                }
+            } catch (e) { 
+                console.warn("MathGames API error. Switching to internal engine:", e); 
+                // Fall through to internal engine
+            }
+        }
+
+        const t = topic.toLowerCase();
+        visualContainer.innerHTML = ''; // Clear visuals
 
         // --- TOPIC: FRACTIONS ---
         if (t.includes('fraction')) {
@@ -736,6 +1176,13 @@ function startMathGame(container, levelText, topic, gameType, gameLevel, subject
                     type: 'numeric'
                 };
                 input.placeholder = "e.g. 3/4 or 0.75";
+            }
+            
+            // Fraction Visual Simulation
+            if (isSimulation) {
+                visualContainer.innerHTML = `
+                    <div style="width:100px; height:100px; background:conic-gradient(#6366f1 0% ${Math.floor((n1/denom)*100)}%, #334155 ${Math.floor((n1/denom)*100)}% 100%); border-radius:50%; margin:0.5rem;"></div>
+                `;
             }
         }
         // --- TOPIC: EXPONENTS / POWERS ---
@@ -774,7 +1221,46 @@ function startMathGame(container, levelText, topic, gameType, gameLevel, subject
             };
             input.placeholder = "<, >, =";
         }
-        // --- DEFAULT TIERS (FALLBACK) ---
+        // --- GRADE 4-6: GEOMETRY ---
+        else if (tier === 'intermediate' && (t.includes('geo') || t.includes('shape') || t.includes('measure'))) {
+            const side = Math.floor(Math.random() * 10) + 2;
+            const isPerimeter = Math.random() > 0.5;
+            if (isPerimeter) {
+                currentQuestion = {
+                    answer: side * 4,
+                    text: `Square Side: ${side}. Perimeter?`,
+                    type: 'numeric'
+                };
+            } else {
+                currentQuestion = {
+                    answer: side * side,
+                    text: `Square Side: ${side}. Area?`,
+                    type: 'numeric'
+                };
+            }
+            input.placeholder = "Value";
+            
+            // Geometry Visual Simulation
+            if (isSimulation) {
+                const bg = isPerimeter ? 'transparent' : 'rgba(99, 102, 241, 0.3)';
+                visualContainer.innerHTML = `<div style="width:${side*10}px; height:${side*10}px; border:3px solid #6366f1; background:${bg}; display:flex; align-items:center; justify-content:center; color:white;">${side}</div>`;
+            }
+        }
+        // --- GRADE 7-12: TRIG & CALCULUS ---
+        else if (tier === 'highschool' && t.includes('trig')) {
+            // Pythagorean Triples (3-4-5 scaled)
+            const k = Math.floor(Math.random() * 4) + 1;
+            currentQuestion = { answer: 5 * k, text: `Rt Triangle: a=${3*k}, b=${4*k}, h=?`, type: 'numeric' };
+            input.placeholder = "Hypotenuse";
+        }
+        else if (tier === 'highschool' && t.includes('calc')) {
+            // Simple Derivatives: d/dx(mx + c) = m
+            const m = Math.floor(Math.random() * 10) + 1;
+            const c = Math.floor(Math.random() * 10);
+            currentQuestion = { answer: m, text: `d/dx (${m}x + ${c})`, type: 'numeric' };
+            input.placeholder = "Value";
+        }
+        // --- DEFAULTS BY GRADE LEVEL ---
         else if (tier === 'highschool') {
             // Algebra: ax + b = c, solve for x
             const x = Math.floor(Math.random() * 10) + 1; // answer
@@ -799,35 +1285,64 @@ function startMathGame(container, levelText, topic, gameType, gameLevel, subject
                 type: 'numeric'
             };
             input.placeholder = "0 or 1";
+        } else if (tier === 'foundation') {
+            // Grade R-3: Counting, Number Rec, Repeated Addition
+            const r = Math.random();
+            if (r < 0.3) {
+                // Counting Game
+                const n = Math.floor(Math.random() * 5) + 1;
+                currentQuestion = { answer: n, text: Array(n).fill('🍎').join(' '), type: 'numeric' };
+            } else if (r < 0.6) {
+                // Repeated Addition (Multiplication Intro)
+                const n = Math.floor(Math.random() * 4) + 1;
+                currentQuestion = { answer: n * 3, text: `${n} + ${n} + ${n} = ?`, type: 'numeric' };
+            } else {
+                // Basic Add/Sub (No Negatives)
+                const n1 = Math.floor(Math.random() * 10) + 1;
+                const n2 = Math.floor(Math.random() * 10) + 1;
+                const isAdd = Math.random() > 0.5;
+                if (isAdd) currentQuestion = { answer: n1 + n2, text: `${n1} + ${n2}`, type: 'numeric' };
+                else {
+                    const high = Math.max(n1, n2);
+                    const low = Math.min(n1, n2);
+                    currentQuestion = { answer: high - low, text: `${high} - ${low}`, type: 'numeric' };
+                }
+            }
         } else {
-            // Standard Arithmetic
-            const n1 = Math.floor(Math.random() * (range * 2)) - range;
-            const n2 = Math.floor(Math.random() * (range * 2)) - range;
-            const isAdd = Math.random() > 0.5;
-            currentQuestion = {
-                answer: isAdd ? n1 + n2 : n1 - n2,
-                text: `${n1} ${isAdd ? '+' : '-'} ${n2 < 0 ? `(${n2})` : n2}`,
-                type: 'numeric'
-            };
+            // Grade 4-6 (Intermediate): Multiplication Tables Default
+            const n1 = Math.floor(Math.random() * 11) + 2;
+            const n2 = Math.floor(Math.random() * 11) + 2;
+            currentQuestion = { answer: n1 * n2, text: `${n1} x ${n2}`, type: 'numeric' };
         }
         
         problemDisplay.textContent = currentQuestion.text;
     }
 
     function endGame() {
-        clearInterval(timerInterval);
-        problemDisplay.textContent = "Game Over!";
+        if (timerInterval) clearInterval(timerInterval);
+        
+        // Passing score threshold (e.g., 40 XP)
+        const passingScore = 40; 
+        const isPass = score >= passingScore;
+
+        problemDisplay.innerHTML = isPass ? "<div>⭐</div><div style='font-size:2rem'>Level Complete!</div>" : "Game Over!";
         feedback.textContent = `Final Score: ${score}`;
         form.querySelector('button').disabled = true;
         input.disabled = true;
         restartBtn.classList.remove('hidden');
+        
+        if (isPass) {
+            nextLevelBtn.textContent = `Play Level ${gameLevel + 1} ➡`;
+            nextLevelBtn.classList.remove('hidden');
+            unlockNextLevel(gameLevel);
+        }
     }
 
-    function startGame() {
+    function runMathLevel() {
         score = 0;
-        timeLeft = 45;
+        timeLeft = isSimulation ? null : 45;
         scoreDisplay.textContent = `⭐ ${score}`;
-        timerDisplay.textContent = `⏱️ ${timeLeft}s`;
+        timerDisplay.textContent = isSimulation ? '∞ Practice' : `⏱️ ${timeLeft}s`;
         feedback.textContent = '';
         form.querySelector('button').disabled = false;
         input.disabled = false;
@@ -835,12 +1350,14 @@ function startMathGame(container, levelText, topic, gameType, gameLevel, subject
         
         generateProblem();
         
-        if (timerInterval) clearInterval(timerInterval);
-        timerInterval = setInterval(() => {
-            timeLeft--;
-            timerDisplay.textContent = `⏱️ ${timeLeft}s`;
-            if (timeLeft <= 0) endGame();
-        }, 1000);
+        if (!isSimulation) {
+            if (timerInterval) clearInterval(timerInterval);
+            timerInterval = setInterval(() => {
+                timeLeft--;
+                timerDisplay.textContent = `⏱️ ${timeLeft}s`;
+                if (timeLeft <= 0) endGame();
+            }, 1000);
+        }
     }
 
     form.addEventListener('submit', (e) => {
@@ -876,10 +1393,11 @@ function startMathGame(container, levelText, topic, gameType, gameLevel, subject
         }
     });
 
-    restartBtn.addEventListener('click', startGame);
+    restartBtn.addEventListener('click', runMathLevel);
+    nextLevelBtn.addEventListener('click', () => startGame(gameLevel + 1));
 
     // Start immediately
-    startGame();
+    runMathLevel();
 }
 
 function switchView(viewId) {
@@ -892,7 +1410,7 @@ function switchView(viewId) {
 
 function getTier(levelText) {
     if (['Grade R', 'Grade 1', 'Grade 2', 'Grade 3'].some(g => levelText.includes(g))) return 'foundation';
-    if (['Grade 4', 'Grade 5', 'Grade 6', 'Grade 7'].some(g => levelText.includes(g))) return 'intermediate';
-    if (['Grade 8', 'Grade 9', 'Grade 10', 'Grade 11', 'Grade 12'].some(g => levelText.includes(g))) return 'highschool';
+    if (['Grade 4', 'Grade 5', 'Grade 6'].some(g => levelText.includes(g))) return 'intermediate';
+    if (['Grade 7', 'Grade 8', 'Grade 9', 'Grade 10', 'Grade 11', 'Grade 12'].some(g => levelText.includes(g))) return 'highschool';
     return 'tertiary';
 }
