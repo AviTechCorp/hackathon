@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EduFlow - Adaptive Learning</title>
+    <link rel="stylesheet" href="styles.css">
+    <!-- Google Fonts: Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <!-- Accessibility: Skip to main content for keyboard users -->
+    <a href="#main-content" class="skip-link">Skip to Main Content</a>
+
+    <header role="banner">
+        <nav class="navbar" role="navigation" aria-label="Main Navigation">
+            <div class="logo">Edu-Tech</div>
+            <div class="controls">
+                <!-- Language Toggler -->
+                <select id="lang-selector" aria-label="Select Language">
+                    <option value="en">English</option>
+                    <option value="es">Español</option>
+                    <option value="fr">Français</option>
+                    <option value="de">Deutsch</option>
+                    <option value="it">Italiano</option>
+                    <option value="pt">Português</option>
+                    <option value="ru">Русский</option>
+                    <option value="zh">中文</option>
+                    <option value="ar">العربية</option>
+                    <option value="ja">日本語</option>
+                    <option value="ko">한국어</option>
+                    <option value="nl">Nederlands</option>
+                    <option value="pl">Polski</option>
+                    <option value="sv">Svenska</option>
+                    <option value="tr">Türkçe</option>
+                    <option value="vi">Tiếng Việt</option>
+                    <option value="hi">हिन्दी</option>
+                    <option value="ur">اردو</option>
+                </select>
+            </div>
+        </nav>
+    </header>
+
+    <main id="main-content" role="main">
+        <!-- Views will be injected here by app.js -->
+        <div id="app-container"></div>
+    </main>
+
+    <footer>
+        <p>&copy; 2026 Edu-Tech. All rights reserved.</p>
+    </footer>
+
+    <!-- Notification Toast Region -->
+    <div id="toast-region" aria-live="assertive"></div>
+
+    <!-- Firebase SDKs -->
+    <script src="https://www.gstatic.com/firebasejs/9.15.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.15.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.15.0/firebase-firestore-compat.js"></script>
+
+    <!-- App Scripts (as modules) -->
+    <script type="module" src="firebase-config.js"></script>
+    <script type="module" src="app.js"></script>
+</body>
+</html>

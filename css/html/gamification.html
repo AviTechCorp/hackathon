@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <meta name="description" content="Play educational games, track your XP, and level up your skills in the EduFlow Games Arena.">
+        <title>Edu-Tech | Games Arena</title>
+        <link rel="stylesheet" href="../css/gamification.css">
+        <!-- Google Fonts: Inter -->
+        <link rel="preconnect" href="https://fonts.googleapis.com">
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    </head>
+    <body>
+        <div class="gamification-layout">
+            <!-- Sidebar Navigation -->
+            <aside class="sidebar">
+                <div class="logo">EduFlow</div>
+                <nav>
+                    <a href="../index.html" class="nav-item">📚 Learning Path</a>
+                    <a href="#" class="nav-item active">🎮 Games Arena</a>
+                    <a href="#" id="logout-btn" class="nav-item logout">🚪 Sign Out</a>
+                </nav>
+            </aside>
+
+            <!-- Main Content -->
+            <main class="main-content">
+                <header class="header">
+                    <h1>Educational Games</h1>
+                    <p>Play games to master subjects and earn XP!</p>
+                </header>
+
+                <!-- User Stats Overview -->
+                <section class="stats-container">
+                    <div class="stat-card">
+                        <span class="stat-label">Current Level</span>
+                        <span class="stat-value" id="level-display">-</span>
+                    </div>
+                    <div class="stat-card">
+                        <span class="stat-label">Total XP</span>
+                        <span class="stat-value" id="xp-display">-</span>
+                    </div>
+                </section>
+
+                <!-- View 1: Subject Selection -->
+                <div id="view-subjects">
+                    <h2 class="section-title">Select a Subject</h2>
+                    <div id="subjects-grid" class="games-grid">
+                        <div class="loading-spinner">Loading subjects...</div>
+                    </div>
+                </div>
+
+                <!-- View 2: Game Configuration (Grade & Topic) -->
+                <div id="view-config" class="hidden">
+                    <button id="back-to-subjects" class="back-btn">← Back to Subjects</button>
+                    <div class="config-card">
+                        <h2 id="config-title">Setup Game</h2>
+                        <p class="game-desc">Please select your level and topic to find the perfect game.</p>
+                        
+                        <form id="game-setup-form">
+                            <div class="form-group">
+                                <label for="education-level">Grade / Level</label>
+                                <select id="education-level" required>
+                                    <!-- Options injected by JS -->
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="game-type">Game Style</label>
+                                <select id="game-type" required>
+                                    <option value="Quiz">⚡ Quick Quiz</option>
+                                    <option value="Puzzle">🧩 Puzzle Challenge</option>
+                                    <option value="Simulation">🧪 Simulation</option>
+                                    <option value="Adventure">🗺️ Adventure Quest</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label id="topic-label" for="game-topic">Topic</label>
+                                <input type="text" id="game-topic" placeholder="e.g. Algebra, Organic Chemistry" required>
+                            </div>
+                            <button type="submit" class="play-btn">Start Game</button>
+                        </form>
+                    </div>
+                </div>
+
+                <!-- View 3: Level Selection -->
+                <div id="view-levels" class="hidden">
+                    <button id="back-to-config-from-levels" class="back-btn">← Back to Setup</button>
+                    <h2 class="section-title">Select Level</h2>
+                    <p class="game-desc">Choose a difficulty level to begin.</p>
+                    <div id="levels-grid" class="levels-grid"></div>
+                </div>
+
+                <!-- View 4: Active Game -->
+                <div id="view-game" class="hidden">
+                    <button id="back-to-levels" class="back-btn">← Back to Levels</button>
+                    <div id="game-container" class="game-frame-container"></div>
+                </div>
+            </main>
+        </div>
+
+        <!-- Firebase SDKs -->
+        <script src="https://www.gstatic.com/firebasejs/9.15.0/firebase-app-compat.js"></script>
+        <script src="https://www.gstatic.com/firebasejs/9.15.0/firebase-auth-compat.js"></script>
+        <script src="https://www.gstatic.com/firebasejs/9.15.0/firebase-firestore-compat.js"></script>
+
+        <!-- Scripts -->
+        <script type="module" src="../firebase-config.js"></script>
+        <script type="module" src="../js/gamification.js"></script>
+    </body>
+</html>

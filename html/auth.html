@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EduFlow - Sign In</title>
+    <link rel="stylesheet" href="../css/auth.css">
+    <!-- Google Fonts: Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="auth-container">
+        <div class="auth-card">
+            <h1 id="form-title">Sign In</h1>
+            <p id="form-subtitle">Welcome back! Please enter your details.</p>
+
+            <!-- Sign In Form -->
+            <form id="signin-form">
+                <div class="input-group">
+                    <label for="signin-email">Email</label>
+                    <input type="email" id="signin-email" required>
+                </div>
+                <div class="input-group">
+                    <label for="signin-password">Password</label>
+                    <input type="password" id="signin-password" required>
+                </div>
+                <button type="submit" class="auth-btn">Sign In</button>
+            </form>
+
+            <!-- Sign Up Form (hidden by default) -->
+            <form id="signup-form" class="hidden">
+                <div class="input-group">
+                    <label for="signup-email">Email</label>
+                    <input type="email" id="signup-email" required>
+                </div>
+                <div class="input-group">
+                    <label for="signup-password">Password</label>
+                    <input type="password" id="signup-password" required>
+                </div>
+                <div class="input-group">
+                    <label for="signup-confirm-password">Confirm Password</label>
+                    <input type="password" id="signup-confirm-password" required>
+                </div>
+                <button type="submit" class="auth-btn">Sign Up</button>
+            </form>
+
+            <div id="error-message" class="error-message hidden"></div>
+
+            <p class="toggle-form">
+                <span id="toggle-text">Don't have an account?</span>
+                <a href="#" id="toggle-link">Sign Up</a>
+            </p>
+        </div>
+    </div>
+
+    <!-- Firebase SDKs -->
+    <script src="https://www.gstatic.com/firebasejs/9.15.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.15.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.15.0/firebase-firestore-compat.js"></script>
+
+    <!-- App Scripts (as modules) -->
+    <script type="module" src="../firebase-config.js"></script>
+    <script type="module" src="../js/auth.js"></script>
+</body>
+</html>
