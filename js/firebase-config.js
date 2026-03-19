@@ -25,3 +25,5 @@ window.firebaseConfig = firebaseConfig;
 window.db = db;
 window.auth = auth;
 window.firebaseStorage = storage;
+
+export { auth, db, storage };

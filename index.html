@@ -17,6 +17,11 @@
     <header role="banner">
         <nav class="navbar" role="navigation" aria-label="Main Navigation">
             <div class="logo">Edu-Tech</div>
+            <ul class="nav-links" style="display: flex; gap: 1.5rem; list-style: none;">
+                <li><a href="index.html" style="text-decoration: none; font-weight: 500;">Learning Path</a></li>
+                <li><a href="html/gamification.html" style="text-decoration: none; font-weight: 500;">Arcade</a></li>
+                <li><a href="html/auth.html" style="text-decoration: none; font-weight: 500;">Login</a></li>
+            </ul>
             <div class="controls">
                 <!-- Language Toggler -->
                 <select id="lang-selector" aria-label="Select Language">
@@ -44,6 +49,43 @@
     </header>
 
     <main id="main-content" role="main">
+        <!-- Landing Page Content (Visible when not logged in) -->
+        <div id="landing-content" class="landing-wrapper">
+            <section class="hero">
+                <div class="hero-text">
+                    <h1>Master the Future<br>of Robotics & Code</h1>
+                    <p>Experience an innovative adaptive learning platform. Build virtual robots, solve complex algorithms, and level up your skills in our gamified arcade.</p>
+                    <a href="html/auth.html" class="cta-button">Start Your Mission</a>
+                </div>
+            </section>
+
+            <section class="features-section">
+                <div class="features-grid">
+                    <article class="feature-card">
+                        <img src="https://images.unsplash.com/photo-1587620962725-abab7fe55159?ixlib=rb-4.0.3&auto=format&fit=crop&w=500&q=80" alt="Coding Monitor">
+                        <div class="feature-content">
+                            <h3>Adaptive Coding</h3>
+                            <p>Learn Python, JavaScript, and C++ logic through interactive puzzles that adapt to your pace.</p>
+                        </div>
+                    </article>
+                    <article class="feature-card">
+                        <img src="https://images.unsplash.com/photo-1485827404703-89b55fcc595e?ixlib=rb-4.0.3&auto=format&fit=crop&w=500&q=80" alt="AI Robot">
+                        <div class="feature-content">
+                            <h3>Robotics Simulation</h3>
+                            <p>Design and test virtual mechanisms. Understand the AI and physics driving modern robotics.</p>
+                        </div>
+                    </article>
+                    <article class="feature-card">
+                        <img src="https://images.unsplash.com/photo-1511512578047-dfb367046420?ixlib=rb-4.0.3&auto=format&fit=crop&w=500&q=80" alt="Gamification Controller">
+                        <div class="feature-content">
+                            <h3>Gamified Mastery</h3>
+                            <p>Earn XP, unlock rare badges, and climb the leaderboard as you conquer new subjects.</p>
+                        </div>
+                    </article>
+                </div>
+            </section>
+        </div>
+
         <!-- Views will be injected here by app.js -->
         <div id="app-container"></div>
     </main>
@@ -61,7 +103,7 @@
     <script src="https://www.gstatic.com/firebasejs/9.15.0/firebase-firestore-compat.js"></script>
 
     <!-- App Scripts (as modules) -->
-    <script type="module" src="firebase-config.js"></script>
+    <script type="module" src="js/firebase-config.js"></script>
     <script type="module" src="app.js"></script>
 </body>
 </html>

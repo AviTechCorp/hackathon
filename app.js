@@ -1,4 +1,4 @@
-import { auth, db } from './firebase-config.js';
+import { auth, db } from './js/firebase-config.js';
 
 class EduApp {
     constructor() {
@@ -16,7 +16,7 @@ class EduApp {
 
     async init() {
         // Make seeder available in console for one-time setup
-        window.seedDatabase = this.seedDatabase;
+        window.seedDatabase = seedDatabase;
 
         // Event Listeners
         document.getElementById('lang-selector').value = this.state.lang;
@@ -34,11 +34,13 @@ class EduApp {
                 this.state.user = user;
                 await this.fetchGameData(); // Fetch nodes and translations
                 await this.fetchUserData(user.uid); // Fetch user progress
-                this.updateStatsUI();
                 this.renderDashboard();
+                this.updateStatsUI();
             } else {
-                // User is not signed in, redirect to the auth page.
-                window.location.href = 'html/auth.html';
+                // User is not signed in: Show Landing Page
+                const landing = document.getElementById('landing-content');
+                if (landing) landing.style.display = 'block';
+                document.getElementById('app-container').innerHTML = ''; // Clear dashboard if any
             }
         });
     }
@@ -55,24 +57,30 @@ class EduApp {
 
     // --- Helper: Translation ---
     t(key) {
-        return DB.translations[this.state.lang][key] || key;
+        return (this.state.translations && this.state.translations[key]) ? this.state.translations[key] : key;
     }
 
     async fetchTranslations() {
-        const translationDoc = await db.collection("translations").doc(this.state.lang).get();
+        let translationDoc = await db.collection("translations").doc(this.state.lang).get();
+        
+        if (!translationDoc.exists) {
+            console.warn("Translations missing. Auto-seeding database...");
+            await seedDatabase(); // Auto-seed if empty
+            translationDoc = await db.collection("translations").doc(this.state.lang).get();
+        }
+
         if (translationDoc.exists) {
             this.state.translations = translationDoc.data();
         } else {
             console.error(`Translations for '${this.state.lang}' not found.`);
-            // Fallback to english
             const enDoc = await db.collection("translations").doc('en').get();
-            this.state.translations = enDoc.data();
+            this.state.translations = enDoc.exists ? enDoc.data() : {};
         }
     }
 
     async fetchUserData(uid) {
         const userDocRef = db.collection("users").doc(uid);
-        const userDoc = await userDoc.get();
+        const userDoc = await userDocRef.get();
 
         if (userDoc.exists) {
             this.state.userData = userDoc.data();
@@ -95,10 +103,18 @@ class EduApp {
             return;
         }
 
+        // Hide Landing Content when showing Dashboard
+        const landing = document.getElementById('landing-content');
+        if (landing) landing.style.display = 'none';
+
         const container = document.getElementById('app-container');
         container.innerHTML = `
             <div class="hero-section">
                 <h1 tabindex="-1" id="dash-title">${this.t('dashboardTitle')}</h1>
+                <div class="user-stats" style="margin-top: 0.5rem; color: #4f46e5; font-weight: 600;">
+                    <span id="user-level">Lvl ${this.state.userData.level}</span> • 
+                    <span id="user-xp">${this.state.userData.xp} XP</span>
+                </div>
             </div>
         `;
         
@@ -215,8 +231,10 @@ class EduApp {
 
     updateStatsUI() {
         if (!this.state.userData) return;
-        document.getElementById('user-xp').textContent = `${this.state.userData.xp} XP`;
-        document.getElementById('user-level').textContent = `Lvl ${this.state.userData.level}`;
+        const xpEl = document.getElementById('user-xp');
+        const lvlEl = document.getElementById('user-level');
+        if (xpEl) xpEl.textContent = `${this.state.userData.xp} XP`;
+        if (lvlEl) lvlEl.textContent = `Lvl ${this.state.userData.level}`;
     }
 
     async saveUserData() {

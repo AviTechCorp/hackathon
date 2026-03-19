@@ -605,7 +605,7 @@ function startSnakeGame(container, levelText, topic, gameLevel, subject) {
         let ruleText = "";
 
         // Determine Content based on Subject
-        if (['math', 'acc', 'compsci', 'eng'].includes(subject.id)) {
+        if (subject && ['math', 'acc', 'compsci', 'eng'].includes(subject.id)) {
             // Math Logic
             const mode = Math.random();
             if (mode < 0.33) {

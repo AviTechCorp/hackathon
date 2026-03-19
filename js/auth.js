@@ -3,24 +3,37 @@ import { auth } from '../firebase-config.js';
 document.addEventListener('DOMContentLoaded', () => {
     const signinForm = document.getElementById('signin-form');
     const signupForm = document.getElementById('signup-form');
+    const resetForm = document.getElementById('reset-form');
     const toggleLink = document.getElementById('toggle-link');
+    const forgotLink = document.getElementById('forgot-password-link');
+    const backToSigninLink = document.getElementById('back-to-signin');
     const formTitle = document.getElementById('form-title');
     const formSubtitle = document.getElementById('form-subtitle');
     const toggleText = document.getElementById('toggle-text');
+    const toggleContainer = document.querySelector('.toggle-form');
     const errorMessageDiv = document.getElementById('error-message');
 
     let isSignIn = true;
 
     // Function to show errors
-    const showError = (message) => {
+    const showError = (message, isSuccess = false) => {
         errorMessageDiv.textContent = message;
         errorMessageDiv.classList.remove('hidden');
+        if (isSuccess) {
+            errorMessageDiv.style.color = '#10b981'; // Green for success
+            errorMessageDiv.style.borderColor = '#10b981';
+        } else {
+            errorMessageDiv.style.color = ''; // Revert to CSS default (red)
+            errorMessageDiv.style.borderColor = '';
+        }
     };
 
     // Function to clear errors
     const clearError = () => {
         errorMessageDiv.textContent = '';
         errorMessageDiv.classList.add('hidden');
+        errorMessageDiv.style.color = '';
+        errorMessageDiv.style.borderColor = '';
     };
 
     // Toggle between Sign In and Sign Up
@@ -63,6 +76,49 @@ document.addEventListener('DOMContentLoaded', () => {
                 nextForm.classList.remove('fading');
             });
         }, 300); // Wait for CSS transition
+    });
+
+    // Show Reset Password Form
+    forgotLink.addEventListener('click', (e) => {
+        e.preventDefault();
+        clearError();
+        
+        signinForm.classList.add('hidden');
+        signupForm.classList.add('hidden');
+        toggleContainer.classList.add('hidden');
+        
+        resetForm.classList.remove('hidden');
+        
+        formTitle.textContent = 'Reset Password';
+        formSubtitle.textContent = 'Enter your email to receive a reset link.';
+    });
+
+    // Back to Sign In from Reset
+    backToSigninLink.addEventListener('click', (e) => {
+        e.preventDefault();
+        clearError();
+        
+        resetForm.classList.add('hidden');
+        signinForm.classList.remove('hidden');
+        toggleContainer.classList.remove('hidden');
+        
+        isSignIn = true;
+        formTitle.textContent = 'Sign In';
+        formSubtitle.textContent = 'Welcome back! Please enter your details.';
+    });
+
+    // Reset Password Logic
+    resetForm.addEventListener('submit', (e) => {
+        e.preventDefault();
+        const email = document.getElementById('reset-email').value;
+
+        auth.sendPasswordResetEmail(email)
+            .then(() => {
+                showError("Password reset email sent! Check your inbox.", true);
+            })
+            .catch((error) => {
+                showError(error.message);
+            });
     });
 
     // Sign In Logic
