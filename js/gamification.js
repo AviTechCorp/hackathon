@@ -41,6 +41,10 @@ document.addEventListener('DOMContentLoaded', () => {
         switchView('view-levels');
     });
 
+    document.getElementById('back-to-config-from-levels').addEventListener('click', () => {
+        switchView('view-config');
+    });
+
     // Dynamic Label for University Course
     document.getElementById('education-level').addEventListener('change', (e) => {
         const label = document.getElementById('topic-label');
@@ -210,17 +214,7 @@ async function startGame(gameLevel) {
     switchView('view-game');
 
     // 1. Simulate "Extraction from Internet/Database"
-    container.innerHTML = `
-        <div style="text-align:center; padding:3rem; color: #cbd5e1;">
-            <div style="font-size:3rem; margin-bottom:1rem; animation: spin 2s linear infinite;">🌍</div>
-            <h3>Searching Knowledge Base...</h3>
-            <p>Extracting content for <strong>${selectedSubject.title}</strong>: <em>${currentConfig.topic}</em></p>
-            <div style="width:200px; height:4px; background:#334155; margin:1rem auto; border-radius:2px; overflow:hidden;">
-                <div style="width:0%; height:100%; background:#6366f1; transition:width 1.5s ease-in-out;" id="load-bar"></div>
-            </div>
-            <style>@keyframes spin { 100% { transform: rotate(360deg); } }</style>
-        </div>
-    `;
+    renderLoadingScreen(container, selectedSubject.title, currentConfig.topic);
 
     // Animate loading bar
     setTimeout(() => {
@@ -228,8 +222,9 @@ async function startGame(gameLevel) {
         if(bar) bar.style.width = '100%';
     }, 100);
 
-    // Wait 1.5s to simulate fetching
-    await new Promise(resolve => setTimeout(resolve, 1500));
+    // Fetch Content from Wikipedia API
+    const contentData = await fetchContentForTopic(currentConfig.topic);
+    
     container.innerHTML = ''; 
 
     // 2. Dispatch Game based on Subject
@@ -240,40 +235,94 @@ async function startGame(gameLevel) {
         if (currentConfig.type === 'Puzzle') {
             startNumberLineGame(container, currentConfig.educationLevel, currentConfig.topic, gameLevel);
         } else {
-            startMathGame(container, currentConfig.educationLevel, currentConfig.topic, currentConfig.type, gameLevel, selectedSubject.title);
+            startMathGame(container, currentConfig.educationLevel, currentConfig.topic, currentConfig.type, gameLevel, selectedSubject.title, contentData);
         }
     } else if (['english', 'law', 'arts'].includes(subj)) {
         // Language & Text Games
-        startWordGame(container, currentConfig.educationLevel, currentConfig.topic, currentConfig.type, gameLevel, selectedSubject.title);
+        startWordGame(container, currentConfig.educationLevel, currentConfig.topic, currentConfig.type, gameLevel, selectedSubject.title, contentData);
     } else {
         // Content-heavy (History, Science, Geo, Life Orientation)
-        startContentQuizGame(container, currentConfig.educationLevel, currentConfig.topic, currentConfig.type, gameLevel, selectedSubject.title);
+        startContentQuizGame(container, currentConfig.educationLevel, currentConfig.topic, currentConfig.type, gameLevel, selectedSubject.title, contentData);
     }
 }
 
-function startContentQuizGame(container, levelText, topic, gameType, gameLevel, subjectTitle) {
+async function fetchContentForTopic(topic) {
+    try {
+        const res = await fetch(`https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(topic)}`);
+        if (!res.ok) return null;
+        const data = await res.json();
+        return data.extract; 
+    } catch (e) {
+        console.warn("API Fetch failed", e);
+        return null;
+    }
+}
+
+function renderLoadingScreen(container, subject, topic) {
+    container.innerHTML = `
+        <div style="text-align:center; padding:3rem; color: #cbd5e1;">
+            <div style="font-size:3rem; margin-bottom:1rem; animation: spin 2s linear infinite;">🌍</div>
+            <h3>Searching Knowledge Base...</h3>
+            <p>Extracting content for <strong>${subject}</strong>: <em>${topic}</em></p>
+            <div style="width:200px; height:4px; background:#334155; margin:1rem auto; border-radius:2px; overflow:hidden;">
+                <div style="width:0%; height:100%; background:#6366f1; transition:width 2s ease-in-out;" id="load-bar"></div>
+            </div>
+            <style>@keyframes spin { 100% { transform: rotate(360deg); } }</style>
+        </div>
+    `;
+}
+
+function startContentQuizGame(container, levelText, topic, gameType, gameLevel, subjectTitle, contentData) {
     let score = 0;
     let qIndex = 0;
 
-    // Simulate questions that dynamically use the User's Topic
-    // This satisfies the "content extracted based on topic" requirement visually
-    const questions = [
-        {
-            q: `Which key concept is foundational to understanding <strong>${topic}</strong>?`,
-            options: ["The Primary Theory", "Historical Relevance", "Abstract Application", "Critical Analysis"],
-            correct: 0
-        },
-        {
-            q: `In the context of ${subjectTitle}, how does <strong>${topic}</strong> influence modern practice?`,
-            options: ["It has no impact", "It redefined the field", "It is considered obsolete", "It is only theoretical"],
-            correct: 1
-        },
-        {
-            q: `True or False: <strong>${topic}</strong> is a core component of the ${levelText} curriculum.`,
-            options: ["True", "False"],
-            correct: 0
-        }
-    ];
+    // Generate Questions from Content Data
+    let questions = [];
+    
+    if (contentData) {
+        const sentences = contentData.split('. ').filter(s => s.length > 20 && s.length < 150);
+        const words = contentData.split(' ').filter(w => w.length > 5).map(w => w.replace(/[^a-zA-Z]/g, ''));
+        
+        sentences.forEach(sentence => {
+            const wordsInSentence = sentence.split(' ');
+            const targetWord = wordsInSentence.find(w => w.length > 6);
+            
+            if (targetWord) {
+                const cleanTarget = targetWord.replace(/[^a-zA-Z0-9-]/g, '');
+                const qText = sentence.replace(targetWord, '_________');
+                
+                const opts = [cleanTarget];
+                while(opts.length < 4) {
+                    const randomWord = words[Math.floor(Math.random() * words.length)];
+                    if (randomWord && !opts.includes(randomWord)) opts.push(randomWord);
+                }
+                const shuffled = opts.sort(() => 0.5 - Math.random());
+                
+                questions.push({
+                    q: qText,
+                    options: shuffled,
+                    correct: shuffled.indexOf(cleanTarget)
+                });
+            }
+        });
+    }
+
+    if (questions.length === 0) {
+        questions = [
+            {
+                q: `Which key concept is foundational to understanding <strong>${topic}</strong>?`,
+                options: ["The Primary Theory", "Historical Relevance", "Abstract Application", "Critical Analysis"],
+                correct: 0
+            },
+            {
+                q: `True or False: <strong>${topic}</strong> is relevant to ${subjectTitle}.`,
+                options: ["True", "False"],
+                correct: 0
+            }
+        ];
+    }
+
+    questions = questions.slice(0, 5);
 
     function renderQuestion() {
         if (qIndex >= questions.length) {
@@ -329,15 +378,34 @@ function startContentQuizGame(container, levelText, topic, gameType, gameLevel, 
     renderQuestion();
 }
 
-function startWordGame(container, levelText, topic, gameType, gameLevel, subjectTitle) {
-    // Extracts the first word of the topic to create a scramble game
-    const keyword = topic.split(' ')[0].toUpperCase() || "LEARNING";
+function startWordGame(container, levelText, topic, gameType, gameLevel, subjectTitle, contentData) {
+    const tier = getTier(levelText);
+    let gameMode = "scramble";
+    
+    // 1. Configure based on Educational Tier
+    if (tier === 'foundation') {
+        // Phonics / Sight Words
+        const sightWords = ["CAT", "DOG", "SUN", "MOM", "DAD", "YES", "NO", "RUN"];
+        var keyword = sightWords[Math.floor(Math.random() * sightWords.length)];
+    } else if (tier === 'tertiary') {
+        // Linguistics & Technical Writing (Regex)
+        startRegexGame(container, topic);
+        return;
+    } else {
+        // Intermediate/High School: Content Vocabulary
+        var keyword = topic.split(' ')[0].toUpperCase();
+        if (contentData) {
+            const bigWords = contentData.split(' ').filter(w => w.length > (tier === 'highschool' ? 6 : 4)).map(w => w.replace(/[^a-zA-Z]/g, '').toUpperCase());
+            if (bigWords.length > 0) keyword = bigWords[Math.floor(Math.random() * bigWords.length)];
+        }
+    }
+    
     const scrambled = keyword.split('').sort(() => 0.5 - Math.random()).join(' ');
 
     container.innerHTML = `
         <div style="text-align:center; color:white;">
-            <h3 style="color:#94a3b8;">${subjectTitle}: Vocabulary</h3>
-            <p>Unscramble the keyword related to <strong>${topic}</strong>:</p>
+            <h3 style="color:#94a3b8;">${subjectTitle}: ${tier === 'foundation' ? 'Phonics' : 'Vocabulary'}</h3>
+            <p>${tier === 'foundation' ? 'What word is this?' : `Unscramble the keyword related to <strong>${topic}</strong>:`}</p>
             
             <h1 style="font-size:3.5rem; letter-spacing:0.5rem; margin:2rem 0; font-family:monospace;">${scrambled}</h1>
             
@@ -354,12 +422,52 @@ function startWordGame(container, levelText, topic, gameType, gameLevel, subject
         const input = document.getElementById('word-input').value.toUpperCase();
         const feedback = document.getElementById('word-feedback');
         
-        if (input === keyword) {
+        if (input === keyword || (tier === 'foundation' && input.includes(keyword))) {
             feedback.textContent = "Correct! Well done.";
             feedback.style.color = "#4ade80";
             setTimeout(() => switchView('view-levels'), 1500);
         } else {
             feedback.textContent = "Try again.";
+            feedback.style.color = "#f87171";
+        }
+    });
+}
+
+function startRegexGame(container, topic) {
+    const patterns = [
+        { desc: "Match any 3 digits", pattern: /^\d{3}$/, hint: "e.g. 123" },
+        { desc: "Match a localized greeting", pattern: /^(Hello|Hola|Bonjour)$/i, hint: "Hello, Hola, or Bonjour" },
+        { desc: "Match an email suffix", pattern: /@gmail\.com$/, hint: "Ends with @gmail.com" },
+        { desc: "Match capital letters only", pattern: /^[A-Z]+$/, hint: "ABC (no numbers or lowercase)" }
+    ];
+    const challenge = patterns[Math.floor(Math.random() * patterns.length)];
+
+    container.innerHTML = `
+        <div style="text-align:center; color:white;">
+            <h3 style="color:#94a3b8;">Tertiary: Syntax & Logic</h3>
+            <p>Write a string that matches this <strong>RegEx</strong> pattern:</p>
+            <code style="display:block; font-size:1.5rem; background:#1e293b; padding:1rem; margin:1rem; border-radius:0.5rem; color:#f472b6;">${challenge.pattern.toString()}</code>
+            <p style="font-size:0.9rem; color:#94a3b8;">Task: ${challenge.desc}</p>
+            
+            <input type="text" id="regex-input" placeholder="Type test string..." autocomplete="off" 
+                style="padding:1rem; font-size:1.2rem; text-align:center; border-radius:0.5rem; border:none; width:300px;">
+            
+            <br><br>
+            <button id="check-regex" class="play-btn" style="width:auto;">Test Pattern</button>
+            <p id="regex-feedback" style="margin-top:1rem; height:20px; font-weight:bold;"></p>
+        </div>
+    `;
+
+    document.getElementById('check-regex').addEventListener('click', () => {
+        const val = document.getElementById('regex-input').value;
+        const feedback = document.getElementById('regex-feedback');
+        
+        if (challenge.pattern.test(val)) {
+            feedback.textContent = "Match Success! Syntax Valid.";
+            feedback.style.color = "#4ade80";
+            setTimeout(() => switchView('view-levels'), 1500);
+        } else {
+            feedback.textContent = "Pattern mismatch. Check syntax.";
             feedback.style.color = "#f87171";
         }
     });
@@ -538,12 +646,15 @@ function startNumberLineGame(container, levelText, topic, gameLevel) {
 }
 
 /* Renamed: Generic Math Game */
-function startMathGame(container, levelText, topic, gameType, gameLevel, subjectTitle) {
+function startMathGame(container, levelText, topic, gameType, gameLevel, subjectTitle, contentData) {
+    const tier = getTier(levelText);
+    
     // Calc Range
     let range = 10;
-    if (levelText.includes('Grade 4') || levelText.includes('Grade 5')) range = 20;
-    else if (levelText.includes('Grade 6') || levelText.includes('Grade 7')) range = 50;
-    else if (parseInt(levelText.replace(/\D/g, '')) >= 8 || levelText.includes('University')) range = 100;
+    if (tier === 'intermediate') range = 50;
+    else if (tier === 'highschool') range = 100;
+    else if (tier === 'tertiary') range = 2; // Binary range
+
     range += (gameLevel * 5);
 
     let timeLeft = 45;
@@ -559,14 +670,19 @@ function startMathGame(container, levelText, topic, gameType, gameLevel, subject
                 <span id="game-score-display">⭐ ${score}</span>
             </div>
             
-            <h3 style="color: #94a3b8; margin:0;">${subjectTitle}: ${topic}</h3>
+            <h3 style="color: #94a3b8; margin:0;">
+                ${tier === 'foundation' ? 'Number Sense' : 
+                  tier === 'highschool' ? 'Functions & Algebra' : 
+                  tier === 'tertiary' ? 'Logic & Computation' : 'Mental Math Fluency'}
+            </h3>
+            <p style="font-size:0.9rem; color:#64748b;">${topic}</p>
             
             <div id="math-problem" style="font-size:3.5rem; font-weight:bold; margin: 2rem 0; font-family: monospace;">
                 Ready?
             </div>
 
             <form id="math-form" style="display:flex; gap:0.5rem; justify-content:center;">
-                <input type="number" id="math-answer" placeholder="?" autocomplete="off" 
+                <input type="text" id="math-answer" placeholder="?" autocomplete="off" 
                     style="width:100px; font-size:1.5rem; padding:0.5rem; text-align:center; border-radius:0.5rem; border:none;">
                 <button type="submit" class="play-btn" style="width:auto;">Submit</button>
             </form>
@@ -586,19 +702,116 @@ function startMathGame(container, levelText, topic, gameType, gameLevel, subject
     const restartBtn = container.querySelector('#math-restart');
 
     function generateProblem() {
-        // Generate random integers (positive and negative)
-        const n1 = Math.floor(Math.random() * (range * 2)) - range;
-        const n2 = Math.floor(Math.random() * (range * 2)) - range;
-        const isAdd = Math.random() > 0.5;
-        
-        currentQuestion = {
-            answer: isAdd ? n1 + n2 : n1 - n2,
-            text: `${n1} ${isAdd ? '+' : '-'} ${n2 < 0 ? `(${n2})` : n2}`
-        };
-        
-        problemDisplay.textContent = currentQuestion.text;
+        const t = topic.toLowerCase();
         input.value = '';
         input.focus();
+
+        // --- TOPIC: FRACTIONS ---
+        if (t.includes('fraction')) {
+            const denom = Math.floor(Math.random() * 10) + 2;
+            const n1 = Math.floor(Math.random() * 5) + 1;
+            const n2 = Math.floor(Math.random() * 5) + 1;
+            
+            if (t.includes('compare') || t.includes('order')) {
+                // Compare logic: 1/2 vs 1/3
+                const d2 = denom + (Math.random() > 0.5 ? 1 : -1) || 3;
+                const val1 = n1/denom;
+                const val2 = n2/d2;
+                let sign = '=';
+                if (val1 > val2) sign = '>';
+                if (val1 < val2) sign = '<';
+                
+                currentQuestion = {
+                    answer: sign,
+                    text: `${n1}/${denom} _ ${n2}/${d2}`,
+                    type: 'symbol'
+                };
+                input.placeholder = "<, >, =";
+            } else {
+                // Arithmetic: 1/4 + 2/4
+                const isAdd = Math.random() > 0.5;
+                currentQuestion = {
+                    answer: isAdd ? (n1 + n2)/denom : (n1 - n2)/denom,
+                    text: `${n1}/${denom} ${isAdd ? '+' : '-'} ${n2}/${denom}`,
+                    type: 'numeric'
+                };
+                input.placeholder = "e.g. 3/4 or 0.75";
+            }
+        }
+        // --- TOPIC: EXPONENTS / POWERS ---
+        else if (t.includes('exponent') || t.includes('power')) {
+            const base = Math.floor(Math.random() * 9) + 2;
+            const exp = Math.floor(Math.random() * 3) + 2;
+            currentQuestion = {
+                answer: Math.pow(base, exp),
+                text: `${base}^${exp}`, // Displays as base^exp
+                type: 'numeric'
+            };
+            input.placeholder = "Value";
+        }
+        // --- TOPIC: PERCENTAGE ---
+        else if (t.includes('percent') || t.includes('finance') || t.includes('tax')) {
+            const whole = (Math.floor(Math.random() * 10) + 1) * 100;
+            const pct = (Math.floor(Math.random() * 5) + 1) * 10; // 10, 20... 50%
+            currentQuestion = {
+                answer: (pct/100) * whole,
+                text: `${pct}% of ${whole}`,
+                type: 'numeric'
+            };
+            input.placeholder = "Amount";
+        }
+        // --- TOPIC: COMPARING (INTEGERS) ---
+        else if (t.includes('compare') || t.includes('order')) {
+            const n1 = Math.floor(Math.random() * 100);
+            const n2 = Math.floor(Math.random() * 100);
+            let sign = '=';
+            if (n1 > n2) sign = '>';
+            if (n1 < n2) sign = '<';
+            currentQuestion = {
+                answer: sign,
+                text: `${n1} _ ${n2}`,
+                type: 'symbol'
+            };
+            input.placeholder = "<, >, =";
+        }
+        // --- DEFAULT TIERS (FALLBACK) ---
+        else if (tier === 'highschool') {
+            // Algebra: ax + b = c, solve for x
+            const x = Math.floor(Math.random() * 10) + 1; // answer
+            const a = Math.floor(Math.random() * 5) + 2;
+            const b = Math.floor(Math.random() * 20) + 1;
+            const c = (a * x) + b;
+            currentQuestion = {
+                answer: x,
+                text: `${a}x + ${b} = ${c}`,
+                type: 'numeric'
+            };
+            input.placeholder = "x = ?";
+        } else if (tier === 'tertiary') {
+            // Logic: 1 AND 0, etc.
+            const a = Math.random() > 0.5 ? 1 : 0;
+            const b = Math.random() > 0.5 ? 1 : 0;
+            const op = Math.random() > 0.5 ? '&' : '|';
+            const ans = op === '&' ? (a & b) : (a | b);
+            currentQuestion = {
+                answer: ans,
+                text: `${a} ${op === '&' ? 'AND' : 'OR'} ${b}`,
+                type: 'numeric'
+            };
+            input.placeholder = "0 or 1";
+        } else {
+            // Standard Arithmetic
+            const n1 = Math.floor(Math.random() * (range * 2)) - range;
+            const n2 = Math.floor(Math.random() * (range * 2)) - range;
+            const isAdd = Math.random() > 0.5;
+            currentQuestion = {
+                answer: isAdd ? n1 + n2 : n1 - n2,
+                text: `${n1} ${isAdd ? '+' : '-'} ${n2 < 0 ? `(${n2})` : n2}`,
+                type: 'numeric'
+            };
+        }
+        
+        problemDisplay.textContent = currentQuestion.text;
     }
 
     function endGame() {
@@ -632,10 +845,25 @@ function startMathGame(container, levelText, topic, gameType, gameLevel, subject
 
     form.addEventListener('submit', (e) => {
         e.preventDefault();
-        const val = parseInt(input.value);
-        if (isNaN(val)) return;
+        let userVal = input.value.trim();
+        if (!userVal) return;
+        
+        let isCorrect = false;
 
-        if (val === currentQuestion.answer) {
+        if (currentQuestion.type === 'symbol') {
+            // String comparison for <, >, =
+            if (userVal === currentQuestion.answer) isCorrect = true;
+        } else {
+            // Numeric comparison (handle "1/2" input)
+            let num = parseFloat(userVal);
+            if (userVal.includes('/')) {
+                const [n, d] = userVal.split('/');
+                if (d) num = parseFloat(n) / parseFloat(d);
+            }
+            if (Math.abs(num - currentQuestion.answer) < 0.01) isCorrect = true;
+        }
+
+        if (isCorrect) {
             score += 10;
             scoreDisplay.textContent = `⭐ ${score}`;
             feedback.textContent = "Correct!";
@@ -660,4 +888,11 @@ function switchView(viewId) {
         if (id === viewId) el.classList.remove('hidden');
         else el.classList.add('hidden');
     });
+}
+
+function getTier(levelText) {
+    if (['Grade R', 'Grade 1', 'Grade 2', 'Grade 3'].some(g => levelText.includes(g))) return 'foundation';
+    if (['Grade 4', 'Grade 5', 'Grade 6', 'Grade 7'].some(g => levelText.includes(g))) return 'intermediate';
+    if (['Grade 8', 'Grade 9', 'Grade 10', 'Grade 11', 'Grade 12'].some(g => levelText.includes(g))) return 'highschool';
+    return 'tertiary';
 }
