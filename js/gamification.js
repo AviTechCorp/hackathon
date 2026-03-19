@@ -1,7 +1,4 @@
 import { auth, db } from '../firebase-config.js';
-import { startPatternGame } from './pattern-game.js';
-import { startPingPong } from './ping-pong.js';
-import { startBalloonPopper } from './balloon-popper.js';
 
 // Subjects Data (Covering Grade R to University)
 const SUBJECTS = [
@@ -29,6 +26,43 @@ let currentConfig = {
     topic: ''
 };
 let currentUserProfile = null;
+
+// --- GENERIC GAME LOADER CLASS ---
+class GameLoader {
+    static async loadAndPlay(type, container, level, onWin, onExit) {
+        const gameModules = {
+            'Pattern': { path: './pattern-game.js', exportName: 'startPatternGame' },
+            'PingPong': { path: './ping-pong.js', exportName: 'startPingPong' },
+            'Balloon': { path: './balloon-popper.js', exportName: 'startBalloonPopper' },
+            'Rangers': { path: './rangers-logic.js', exportName: 'startRangersGame' }
+        };
+
+        const config = gameModules[type];
+        if (!config) return false;
+
+        try {
+            const module = await import(config.path);
+            if (module && typeof module[config.exportName] === 'function') {
+                module[config.exportName](container, level, onWin, onExit);
+                return true;
+            }
+        } catch (error) {
+            console.error(`Failed to load ${type} game module:`, error);
+            container.innerHTML = `
+                <div style="text-align:center; padding:2rem; color:#f87171;">
+                    <div style="font-size:3rem;">⚠️</div>
+                    <h3>Module Error</h3>
+                    <p>Could not load the <strong>${type}</strong> game module.</p>
+                    <p style="font-size:0.9rem; color:#94a3b8;">${error.message}</p>
+                    <button class="play-btn" style="width:auto; margin-top:1rem;" id="error-back-btn">Go Back</button>
+                </div>
+            `;
+            document.getElementById('error-back-btn').addEventListener('click', onExit);
+            return true; // Return true to indicate we handled the game start attempt (even if it failed)
+        }
+        return false;
+    }
+}
 
 document.addEventListener('DOMContentLoaded', () => {
     // Logout Handler
@@ -297,35 +331,19 @@ async function startGame(gameLevel) {
         return;
     }
 
-    // 1.6 Check for Pattern Recognition
-    if (currentConfig.type === 'Pattern') {
-        startPatternGame(container, gameLevel, () => {
-            updateUserXP(100);
-            unlockNextLevel(gameLevel);
-            switchView('view-levels');
-        }, () => switchView('view-levels'));
-        return;
-    }
+    // Dynamic Game Loader for Modular Games
+    const onGameWin = (result) => {
+        // Pattern game passes Event object (use default 100), others pass XP number
+        const xp = typeof result === 'number' ? result : 100;
+        updateUserXP(xp);
+        unlockNextLevel(gameLevel);
+        switchView('view-levels');
+    };
+    const onGameExit = () => switchView('view-levels');
 
-    // 1.8 Check for Ping Pong (Physics/Coordination)
-    if (currentConfig.type === 'PingPong') {
-        // Returns a cleanup function, though not strictly used here unless we add a generic cleanup hook
-        startPingPong(container, gameLevel, (xpEarned) => {
-            updateUserXP(xpEarned);
-            unlockNextLevel(gameLevel);
-            switchView('view-levels');
-        });
-        return;
-    }
-
-    // 1.9 Check for Balloon Popper (Reflexes)
-    if (currentConfig.type === 'Balloon') {
-        const cleanup = startBalloonPopper(container, gameLevel, (xpEarned) => {
-            updateUserXP(xpEarned);
-            unlockNextLevel(gameLevel);
-            switchView('view-levels');
-        });
-        // Note: Ideally, we store 'cleanup' to call it if the user exits prematurely
+    // Attempt to load via GameLoader
+    const handledByLoader = await GameLoader.loadAndPlay(currentConfig.type, container, gameLevel, onGameWin, onGameExit);
+    if (handledByLoader) {
         return;
     }
 
