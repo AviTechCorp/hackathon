@@ -1,4 +1,7 @@
 import { auth, db } from '../firebase-config.js';
+import { startPatternGame } from './pattern-game.js';
+import { startPingPong } from './ping-pong.js';
+import { startBalloonPopper } from './balloon-popper.js';
 
 // Subjects Data (Covering Grade R to University)
 const SUBJECTS = [
@@ -15,6 +18,9 @@ const SUBJECTS = [
     { id: 'med', title: 'Health Sciences', icon: '🩺', desc: 'Anatomy, Medicine & Physiology.' },
     { id: 'law', title: 'Law', icon: '⚖️', desc: 'Legal systems and Constitution.' }
 ];
+
+// --- CONFIGURATION ---
+const GEMINI_API_KEY = "AIzaSyDIU1eNQc9XZXJgl7aMe73kBa5dzv1KtqE";
 
 // Global Config State
 let currentConfig = {
@@ -78,6 +84,15 @@ document.addEventListener('DOMContentLoaded', () => {
             window.location.href = '../html/auth.html';
         }
     });
+
+    // --- EVENT: Standardized Game Completion Listener ---
+    // Suggestion 3: Decoupled results handling
+    document.addEventListener('eduFlow:gameComplete', (e) => {
+        const { score, metadata } = e.detail;
+        if (score > 0) {
+            saveGameSession(metadata);
+        }
+    });
 });
 
 async function loadUserProfile(uid) {
@@ -93,10 +108,11 @@ async function loadUserProfile(uid) {
         
         if (!userDoc.exists) {
             // Profile missing (new user), create default
-            userData = { xp: 0, level: 1, completedNodes: [] };
+            userData = { xp: 0, level: 1, completedNodes: [], levels: {} };
             await userDocRef.set(userData);
         } else {
             userData = userDoc.data();
+            if (!userData.levels) userData.levels = {};
         }
         currentUserProfile = userData;
 
@@ -198,7 +214,12 @@ function handleConfigSubmit(e) {
 function renderLevels() {
     const grid = document.getElementById('levels-grid');
     grid.innerHTML = '';
-    const maxUnlocked = currentUserProfile ? (currentUserProfile.level || 1) : 1;
+    
+    let maxUnlocked = 1;
+    if (currentUserProfile && selectedSubject && currentUserProfile.levels && currentConfig.type) {
+        const key = `${selectedSubject.id}_${currentConfig.type}_${currentConfig.topic}`;
+        maxUnlocked = currentUserProfile.levels[key] || 1;
+    }
 
     // Generate 12 Levels
     for (let i = 1; i <= 12; i++) {
@@ -218,17 +239,22 @@ function renderLevels() {
 }
 
 async function unlockNextLevel(completedLevel) {
-    if (!currentUserProfile || !auth.currentUser) return;
+    if (!currentUserProfile || !auth.currentUser || !selectedSubject) return;
+
+    const key = `${selectedSubject.id}_${currentConfig.type}_${currentConfig.topic}`;
+    const currentMax = (currentUserProfile.levels && currentUserProfile.levels[key]) || 1;
 
     // If the user just completed their current highest level, unlock the next one
-    if (completedLevel === (currentUserProfile.level || 1)) {
+    if (completedLevel === currentMax) {
         const newLevel = completedLevel + 1;
         try {
+            if (!currentUserProfile.levels) currentUserProfile.levels = {};
+            currentUserProfile.levels[key] = newLevel;
+
             await db.collection('users').doc(auth.currentUser.uid).update({
-                level: newLevel
+                [`levels.${key}`]: newLevel
             });
-            currentUserProfile.level = newLevel;
-            document.getElementById('level-display').textContent = newLevel;
+            renderLevels(); // Re-render to show unlock
         } catch (error) {
             console.error("Error unlocking level:", error);
         }
@@ -252,11 +278,60 @@ async function startGame(gameLevel) {
     // Fetch Content from Wikipedia API
     const contentData = await fetchContentForTopic(currentConfig.topic);
     
+    // --- AI CONTENT GENERATION ---
+    // If API Key is present, try to generate questions dynamically
+    let aiQuestions = null;
+    if (GEMINI_API_KEY && currentConfig.type === 'Quiz') {
+        try {
+            aiQuestions = await generateAIQuestions(currentConfig.topic, currentConfig.educationLevel, selectedSubject.title);
+        } catch (e) {
+            console.warn("AI Generation failed, falling back to standard content.", e);
+        }
+    }
+    
     container.innerHTML = ''; 
 
     // 1.5. Check for Minigames (Snake)
     if (currentConfig.type === 'Snake') {
         startSnakeGame(container, currentConfig.educationLevel, currentConfig.topic, gameLevel, selectedSubject);
+        return;
+    }
+
+    // 1.6 Check for Pattern Recognition
+    if (currentConfig.type === 'Pattern') {
+        startPatternGame(container, gameLevel, () => {
+            updateUserXP(100);
+            unlockNextLevel(gameLevel);
+            switchView('view-levels');
+        }, () => switchView('view-levels'));
+        return;
+    }
+
+    // 1.8 Check for Ping Pong (Physics/Coordination)
+    if (currentConfig.type === 'PingPong') {
+        // Returns a cleanup function, though not strictly used here unless we add a generic cleanup hook
+        startPingPong(container, gameLevel, (xpEarned) => {
+            updateUserXP(xpEarned);
+            unlockNextLevel(gameLevel);
+            switchView('view-levels');
+        });
+        return;
+    }
+
+    // 1.9 Check for Balloon Popper (Reflexes)
+    if (currentConfig.type === 'Balloon') {
+        const cleanup = startBalloonPopper(container, gameLevel, (xpEarned) => {
+            updateUserXP(xpEarned);
+            unlockNextLevel(gameLevel);
+            switchView('view-levels');
+        });
+        // Note: Ideally, we store 'cleanup' to call it if the user exits prematurely
+        return;
+    }
+
+    // 1.7 Check for AI-Generated Quiz (Overrides subject defaults if available)
+    if (aiQuestions && aiQuestions.length > 0) {
+        startContentQuizGame(container, currentConfig.educationLevel, currentConfig.topic, currentConfig.type, gameLevel, selectedSubject.title, null, aiQuestions);
         return;
     }
 
@@ -272,7 +347,8 @@ async function startGame(gameLevel) {
         if ((currentConfig.type === 'Puzzle' || currentConfig.type === 'Simulation') && isIntegerTopic) {
             startNumberLineGame(container, currentConfig.educationLevel, currentConfig.topic, gameLevel);
         } else {
-            startMathGame(container, currentConfig.educationLevel, currentConfig.topic, currentConfig.type, gameLevel, selectedSubject.title, contentData);
+            // Use the new Generic Engine (Suggestion 1)
+            startUniversalQuizEngine(container, currentConfig.educationLevel, currentConfig.topic, currentConfig.type, gameLevel, selectedSubject.title);
         }
     } else if (['english', 'law', 'arts'].includes(subj)) {
         // Language & Text Games
@@ -281,6 +357,68 @@ async function startGame(gameLevel) {
         // Content-heavy (History, Science, Geo, Life Orientation)
         startContentQuizGame(container, currentConfig.educationLevel, currentConfig.topic, currentConfig.type, gameLevel, selectedSubject.title, contentData);
     }
+}
+
+async function updateUserXP(amount) {
+    if (!currentUserProfile || !auth.currentUser) return;
+    
+    const xpToAdd = parseInt(amount) || 0;
+    if (xpToAdd <= 0) return;
+
+    const newXP = (currentUserProfile.xp || 0) + xpToAdd;
+    currentUserProfile.xp = newXP;
+
+    // Update UI
+    const xpDisplay = document.getElementById('xp-display');
+    if (xpDisplay) xpDisplay.textContent = newXP;
+
+    try {
+        await db.collection('users').doc(auth.currentUser.uid).update({
+            xp: newXP
+        });
+    } catch (error) {
+        console.error("Error updating XP:", error);
+    }
+}
+
+// --- Suggestion 5: Structured Reporting ---
+async function saveGameSession(sessionData) {
+    if (!auth.currentUser) return;
+    
+    // 1. Update Aggregate XP (Immediate UI Feedback)
+    updateUserXP(sessionData.score);
+    
+    // 2. Save Detailed Metadata (Competency Map)
+    try {
+        await db.collection('users').doc(auth.currentUser.uid).collection('game_sessions').add({
+            ...sessionData,
+            timestamp: new Date() // Use serverTimestamp() in production
+        });
+    } catch (e) {
+        console.error("Error saving session metadata:", e);
+    }
+}
+
+// --- AI Generator Helper ---
+async function generateAIQuestions(topic, level, subject) {
+    const prompt = `Generate 5 multiple choice questions for ${level} students about "${topic}" in the subject of ${subject}. 
+    Return ONLY a raw JSON array (no markdown) in this format: 
+    [{"q": "Question text", "options": ["Option A", "Option B", "Option C", "Option D"], "correct": 0}] 
+    (Where 'correct' is the array index 0-3 of the right answer).`;
+
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${GEMINI_API_KEY}`;
+    
+    const response = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
+    });
+
+    const data = await response.json();
+    const text = data.candidates[0].content.parts[0].text;
+    // Clean up markdown code blocks if AI adds them
+    const jsonStr = text.replace(/```json/g, '').replace(/```/g, '').trim();
+    return JSON.parse(jsonStr);
 }
 
 async function fetchContentForTopic(topic) {
@@ -309,14 +447,18 @@ function renderLoadingScreen(container, subject, topic) {
     `;
 }
 
-function startContentQuizGame(container, levelText, topic, gameType, gameLevel, subjectTitle, contentData) {
+function startContentQuizGame(container, levelText, topic, gameType, gameLevel, subjectTitle, contentData, aiQuestions = null) {
     let score = 0;
     let qIndex = 0;
 
     // Generate Questions from Content Data
     let questions = [];
     
-    if (contentData) {
+    if (aiQuestions && aiQuestions.length > 0) {
+        // Use AI Generated Questions
+        questions = aiQuestions;
+    } else if (contentData) {
+        // Fallback: Generate from Wikipedia text
         const sentences = contentData.split('. ').filter(s => s.length > 20 && s.length < 150);
         const words = contentData.split(' ').filter(w => w.length > 5).map(w => w.replace(/[^a-zA-Z]/g, ''));
         
@@ -371,7 +513,11 @@ function startContentQuizGame(container, levelText, topic, gameType, gameLevel, 
                     <button id="finish-quiz" class="play-btn" style="margin-top:1rem; width:auto;">Return to Menu</button>
                 </div>
             `;
-            document.getElementById('finish-quiz').addEventListener('click', () => switchView('view-levels'));
+            document.getElementById('finish-quiz').addEventListener('click', () => {
+                updateUserXP(score);
+                unlockNextLevel(gameLevel);
+                switchView('view-levels');
+            });
             return;
         }
 
@@ -426,7 +572,7 @@ function startWordGame(container, levelText, topic, gameType, gameLevel, subject
         var keyword = sightWords[Math.floor(Math.random() * sightWords.length)];
     } else if (tier === 'tertiary') {
         // Linguistics & Technical Writing (Regex)
-        startRegexGame(container, topic);
+        startRegexGame(container, topic, gameLevel);
         return;
     } else {
         // Intermediate/High School: Content Vocabulary
@@ -462,6 +608,8 @@ function startWordGame(container, levelText, topic, gameType, gameLevel, subject
         if (input === keyword || (tier === 'foundation' && input.includes(keyword))) {
             feedback.textContent = "Correct! Well done.";
             feedback.style.color = "#4ade80";
+            updateUserXP(50);
+            unlockNextLevel(gameLevel);
             setTimeout(() => switchView('view-levels'), 1500);
         } else {
             feedback.textContent = "Try again.";
@@ -470,7 +618,7 @@ function startWordGame(container, levelText, topic, gameType, gameLevel, subject
     });
 }
 
-function startRegexGame(container, topic) {
+function startRegexGame(container, topic, gameLevel) {
     const patterns = [
         { desc: "Match any 3 digits", pattern: /^\d{3}$/, hint: "e.g. 123" },
         { desc: "Match a localized greeting", pattern: /^(Hello|Hola|Bonjour)$/i, hint: "Hello, Hola, or Bonjour" },
@@ -502,6 +650,8 @@ function startRegexGame(container, topic) {
         if (challenge.pattern.test(val)) {
             feedback.textContent = "Match Success! Syntax Valid.";
             feedback.style.color = "#4ade80";
+            updateUserXP(50);
+            unlockNextLevel(gameLevel);
             setTimeout(() => switchView('view-levels'), 1500);
         } else {
             feedback.textContent = "Pattern mismatch. Check syntax.";
@@ -823,6 +973,7 @@ function startSnakeGame(container, levelText, topic, gameLevel, subject) {
             nextLevelBtn.textContent = `Play Level ${gameLevel + 1} ➡`;
             nextLevelBtn.classList.remove('hidden');
             unlockNextLevel(gameLevel);
+            updateUserXP(score);
         }
     }
 
@@ -1049,8 +1200,126 @@ function startNumberLineGame(container, levelText, topic, gameLevel) {
     generateProblem();
 }
 
-/* Renamed: Generic Math Game */
-function startMathGame(container, levelText, topic, gameType, gameLevel, subjectTitle, contentData) {
+/* --- Suggestion 1: Data-Driven Content Registry --- */
+const ContentRegistry = {
+    // Generators return: { question: {text, answer, type}, visual: HTML, placeholder: string }
+    
+    fractions: (tier, level, isSim) => {
+        const denom = Math.floor(Math.random() * 10) + 2;
+        const n1 = Math.floor(Math.random() * 5) + 1;
+        const n2 = Math.floor(Math.random() * 5) + 1;
+        
+        // Visuals
+        let visualHTML = '';
+        if (isSim) {
+            visualHTML = `<div style="width:100px; height:100px; background:conic-gradient(#6366f1 0% ${Math.floor((n1/denom)*100)}%, #334155 ${Math.floor((n1/denom)*100)}% 100%); border-radius:50%; margin:0.5rem;"></div>`;
+        }
+
+        return {
+            question: {
+                answer: (n1 + n2)/denom,
+                text: `${n1}/${denom} + ${n2}/${denom}`,
+                type: 'numeric'
+            },
+            visual: visualHTML,
+            placeholder: "e.g. 0.75 or 3/4"
+        };
+    },
+
+    geometry: (tier, level, isSim) => {
+        const side = Math.floor(Math.random() * 10) + 2;
+        const isArea = Math.random() > 0.5;
+        
+        let visualHTML = '';
+        if (isSim) {
+            visualHTML = `<div style="width:${side*8}px; height:${side*8}px; border:2px solid #6366f1; background:${isArea ? 'rgba(99,102,241,0.2)' : 'transparent'}; display:grid; place-items:center;">${side}</div>`;
+        }
+
+        return {
+            question: {
+                answer: isArea ? side * side : side * 4,
+                text: `Square Side: ${side}. Find ${isArea ? 'Area' : 'Perimeter'}?`,
+                type: 'numeric'
+            },
+            visual: visualHTML,
+            placeholder: "Value"
+        };
+    },
+
+    algebra: (tier, level) => {
+        const x = Math.floor(Math.random() * 10) + 1;
+        const a = Math.floor(Math.random() * 5) + 2;
+        const b = Math.floor(Math.random() * 20) + 1;
+        const c = (a * x) + b;
+        return {
+            question: { answer: x, text: `${a}x + ${b} = ${c}`, type: 'numeric' },
+            visual: '',
+            placeholder: "x = ?"
+        };
+    },
+
+    logic: (tier, level) => {
+        const a = Math.random() > 0.5 ? 1 : 0;
+        const b = Math.random() > 0.5 ? 1 : 0;
+        const op = Math.random() > 0.5 ? '&' : '|';
+        return {
+            question: { 
+                answer: op === '&' ? (a & b) : (a | b), 
+                text: `${a} ${op === '&' ? 'AND' : 'OR'} ${b}`, 
+                type: 'numeric' 
+            },
+            visual: '',
+            placeholder: "0 or 1"
+        };
+    },
+
+    default_foundation: () => {
+        const n1 = Math.floor(Math.random() * 10) + 1;
+        const n2 = Math.floor(Math.random() * 10) + 1;
+        return {
+            question: { answer: n1 + n2, text: `${n1} + ${n2}`, type: 'numeric' },
+            visual: '',
+            placeholder: "?"
+        };
+    },
+
+    default_intermediate: () => {
+        const n1 = Math.floor(Math.random() * 11) + 2;
+        const n2 = Math.floor(Math.random() * 11) + 2;
+        return {
+            question: { answer: n1 * n2, text: `${n1} x ${n2}`, type: 'numeric' },
+            visual: '',
+            placeholder: "?"
+        };
+    }
+};
+
+function getProblemFromRegistry(topic, tier, level, isSim) {
+    const t = topic.toLowerCase();
+    
+    if (t.includes('fraction')) return ContentRegistry.fractions(tier, level, isSim);
+    if (t.includes('geo') || t.includes('shape')) return ContentRegistry.geometry(tier, level, isSim);
+    
+    // Tier based defaults
+    if (tier === 'highschool') {
+        if (t.includes('calc') || t.includes('trig')) {
+            // Fallback for now, normally would have specific generators
+            return ContentRegistry.algebra(tier, level); 
+        }
+        return ContentRegistry.algebra(tier, level);
+    }
+    
+    if (tier === 'tertiary') return ContentRegistry.logic(tier, level);
+    if (tier === 'foundation') return ContentRegistry.default_foundation();
+    
+    return ContentRegistry.default_intermediate();
+}
+
+/* 
+ * Universal Question Engine
+ * Replaces startMathGame. Can run any subject if provided a generator in ContentRegistry.
+ */
+function startUniversalQuizEngine(container, levelText, topic, gameType, gameLevel, subjectTitle) {
     const tier = getTier(levelText);
     const isSimulation = (gameType === 'Simulation' || gameType === 'Puzzle');
     
@@ -1066,6 +1335,7 @@ function startMathGame(container, levelText, topic, gameType, gameLevel, subject
     let score = 0;
     let timerInterval;
     let currentQuestion = null;
+    let errors = []; // For metadata
 
     // Build Game UI
     container.innerHTML = `
@@ -1116,206 +1386,16 @@ function startMathGame(container, levelText, topic, gameType, gameLevel, subject
     const visualContainer = container.querySelector('#math-visual');
 
     async function generateProblem() {
-        input.value = '';
+        input.value = ''; 
         input.focus();
 
-        // --- MathGames API Integration ---
-        if (gameType === 'MathGames' && window.MathGames) {
-            try {
-                // Map topic to skill
-                const skillMap = { 'fraction': 'fractions', 'geo': 'geometry', 'algebra': 'algebra', 'trig': 'trigonometry' };
-                const skillKey = Object.keys(skillMap).find(k => topic.toLowerCase().includes(k)) || 'arithmetic';
-                
-                await window.MathGames.selectSkill(skillMap[skillKey] || 'arithmetic');
-                const apiQ = await window.MathGames.getQuestion(gameLevel);
-                
-                if (apiQ && apiQ.question) {
-                    currentQuestion = { answer: apiQ.answer, text: apiQ.question, type: 'numeric' };
-                    problemDisplay.textContent = currentQuestion.text;
-                    return;
-                } else {
-                    // Fallback to internal engine if API returns no data
-                    console.warn("MathGames API returned no question. Switching to internal engine.");
-                }
-            } catch (e) { 
-                console.warn("MathGames API error. Switching to internal engine:", e); 
-                // Fall through to internal engine
-            }
-        }
-
-        const t = topic.toLowerCase();
-        visualContainer.innerHTML = ''; // Clear visuals
-
-        // --- TOPIC: FRACTIONS ---
-        if (t.includes('fraction')) {
-            const denom = Math.floor(Math.random() * 10) + 2;
-            const n1 = Math.floor(Math.random() * 5) + 1;
-            const n2 = Math.floor(Math.random() * 5) + 1;
-            
-            if (t.includes('compare') || t.includes('order')) {
-                // Compare logic: 1/2 vs 1/3
-                const d2 = denom + (Math.random() > 0.5 ? 1 : -1) || 3;
-                const val1 = n1/denom;
-                const val2 = n2/d2;
-                let sign = '=';
-                if (val1 > val2) sign = '>';
-                if (val1 < val2) sign = '<';
-                
-                currentQuestion = {
-                    answer: sign,
-                    text: `${n1}/${denom} _ ${n2}/${d2}`,
-                    type: 'symbol'
-                };
-                input.placeholder = "<, >, =";
-            } else {
-                // Arithmetic: 1/4 + 2/4
-                const isAdd = Math.random() > 0.5;
-                currentQuestion = {
-                    answer: isAdd ? (n1 + n2)/denom : (n1 - n2)/denom,
-                    text: `${n1}/${denom} ${isAdd ? '+' : '-'} ${n2}/${denom}`,
-                    type: 'numeric'
-                };
-                input.placeholder = "e.g. 3/4 or 0.75";
-            }
-            
-            // Fraction Visual Simulation
-            if (isSimulation) {
-                visualContainer.innerHTML = `
-                    <div style="width:100px; height:100px; background:conic-gradient(#6366f1 0% ${Math.floor((n1/denom)*100)}%, #334155 ${Math.floor((n1/denom)*100)}% 100%); border-radius:50%; margin:0.5rem;"></div>
-                `;
-            }
-        }
-        // --- TOPIC: EXPONENTS / POWERS ---
-        else if (t.includes('exponent') || t.includes('power')) {
-            const base = Math.floor(Math.random() * 9) + 2;
-            const exp = Math.floor(Math.random() * 3) + 2;
-            currentQuestion = {
-                answer: Math.pow(base, exp),
-                text: `${base}^${exp}`, // Displays as base^exp
-                type: 'numeric'
-            };
-            input.placeholder = "Value";
-        }
-        // --- TOPIC: PERCENTAGE ---
-        else if (t.includes('percent') || t.includes('finance') || t.includes('tax')) {
-            const whole = (Math.floor(Math.random() * 10) + 1) * 100;
-            const pct = (Math.floor(Math.random() * 5) + 1) * 10; // 10, 20... 50%
-            currentQuestion = {
-                answer: (pct/100) * whole,
-                text: `${pct}% of ${whole}`,
-                type: 'numeric'
-            };
-            input.placeholder = "Amount";
-        }
-        // --- TOPIC: COMPARING (INTEGERS) ---
-        else if (t.includes('compare') || t.includes('order')) {
-            const n1 = Math.floor(Math.random() * 100);
-            const n2 = Math.floor(Math.random() * 100);
-            let sign = '=';
-            if (n1 > n2) sign = '>';
-            if (n1 < n2) sign = '<';
-            currentQuestion = {
-                answer: sign,
-                text: `${n1} _ ${n2}`,
-                type: 'symbol'
-            };
-            input.placeholder = "<, >, =";
-        }
-        // --- GRADE 4-6: GEOMETRY ---
-        else if (tier === 'intermediate' && (t.includes('geo') || t.includes('shape') || t.includes('measure'))) {
-            const side = Math.floor(Math.random() * 10) + 2;
-            const isPerimeter = Math.random() > 0.5;
-            if (isPerimeter) {
-                currentQuestion = {
-                    answer: side * 4,
-                    text: `Square Side: ${side}. Perimeter?`,
-                    type: 'numeric'
-                };
-            } else {
-                currentQuestion = {
-                    answer: side * side,
-                    text: `Square Side: ${side}. Area?`,
-                    type: 'numeric'
-                };
-            }
-            input.placeholder = "Value";
-            
-            // Geometry Visual Simulation
-            if (isSimulation) {
-                const bg = isPerimeter ? 'transparent' : 'rgba(99, 102, 241, 0.3)';
-                visualContainer.innerHTML = `<div style="width:${side*10}px; height:${side*10}px; border:3px solid #6366f1; background:${bg}; display:flex; align-items:center; justify-content:center; color:white;">${side}</div>`;
-            }
-        }
-        // --- GRADE 7-12: TRIG & CALCULUS ---
-        else if (tier === 'highschool' && t.includes('trig')) {
-            // Pythagorean Triples (3-4-5 scaled)
-            const k = Math.floor(Math.random() * 4) + 1;
-            currentQuestion = { answer: 5 * k, text: `Rt Triangle: a=${3*k}, b=${4*k}, h=?`, type: 'numeric' };
-            input.placeholder = "Hypotenuse";
-        }
-        else if (tier === 'highschool' && t.includes('calc')) {
-            // Simple Derivatives: d/dx(mx + c) = m
-            const m = Math.floor(Math.random() * 10) + 1;
-            const c = Math.floor(Math.random() * 10);
-            currentQuestion = { answer: m, text: `d/dx (${m}x + ${c})`, type: 'numeric' };
-            input.placeholder = "Value";
-        }
-        // --- DEFAULTS BY GRADE LEVEL ---
-        else if (tier === 'highschool') {
-            // Algebra: ax + b = c, solve for x
-            const x = Math.floor(Math.random() * 10) + 1; // answer
-            const a = Math.floor(Math.random() * 5) + 2;
-            const b = Math.floor(Math.random() * 20) + 1;
-            const c = (a * x) + b;
-            currentQuestion = {
-                answer: x,
-                text: `${a}x + ${b} = ${c}`,
-                type: 'numeric'
-            };
-            input.placeholder = "x = ?";
-        } else if (tier === 'tertiary') {
-            // Logic: 1 AND 0, etc.
-            const a = Math.random() > 0.5 ? 1 : 0;
-            const b = Math.random() > 0.5 ? 1 : 0;
-            const op = Math.random() > 0.5 ? '&' : '|';
-            const ans = op === '&' ? (a & b) : (a | b);
-            currentQuestion = {
-                answer: ans,
-                text: `${a} ${op === '&' ? 'AND' : 'OR'} ${b}`,
-                type: 'numeric'
-            };
-            input.placeholder = "0 or 1";
-        } else if (tier === 'foundation') {
-            // Grade R-3: Counting, Number Rec, Repeated Addition
-            const r = Math.random();
-            if (r < 0.3) {
-                // Counting Game
-                const n = Math.floor(Math.random() * 5) + 1;
-                currentQuestion = { answer: n, text: Array(n).fill('🍎').join(' '), type: 'numeric' };
-            } else if (r < 0.6) {
-                // Repeated Addition (Multiplication Intro)
-                const n = Math.floor(Math.random() * 4) + 1;
-                currentQuestion = { answer: n * 3, text: `${n} + ${n} + ${n} = ?`, type: 'numeric' };
-            } else {
-                // Basic Add/Sub (No Negatives)
-                const n1 = Math.floor(Math.random() * 10) + 1;
-                const n2 = Math.floor(Math.random() * 10) + 1;
-                const isAdd = Math.random() > 0.5;
-                if (isAdd) currentQuestion = { answer: n1 + n2, text: `${n1} + ${n2}`, type: 'numeric' };
-                else {
-                    const high = Math.max(n1, n2);
-                    const low = Math.min(n1, n2);
-                    currentQuestion = { answer: high - low, text: `${high} - ${low}`, type: 'numeric' };
-                }
-            }
-        } else {
-            // Grade 4-6 (Intermediate): Multiplication Tables Default
-            const n1 = Math.floor(Math.random() * 11) + 2;
-            const n2 = Math.floor(Math.random() * 11) + 2;
-            currentQuestion = { answer: n1 * n2, text: `${n1} x ${n2}`, type: 'numeric' };
-        }
+        // Fetch problem from Data-Driven Registry
+        const problem = getProblemFromRegistry(topic, tier, gameLevel, isSimulation);
         
+        currentQuestion = problem.question;
+        visualContainer.innerHTML = problem.visual || '';
         problemDisplay.textContent = currentQuestion.text;
+        input.placeholder = problem.placeholder || "?";
     }
 
     function endGame() {
@@ -1335,6 +1415,21 @@ function startMathGame(container, levelText, topic, gameType, gameLevel, subject
             nextLevelBtn.textContent = `Play Level ${gameLevel + 1} ➡`;
             nextLevelBtn.classList.remove('hidden');
             unlockNextLevel(gameLevel);
+            
+            // --- Suggestion 3: Dispatch Custom Event for Results ---
+            const event = new CustomEvent('eduFlow:gameComplete', {
+                detail: {
+                    score: score,
+                    metadata: {
+                        game: "UniversalQuiz",
+                        topic: topic,
+                        level: gameLevel,
+                        score: score,
+                        errors: errors
+                    }
+                }
+            });
+            document.dispatchEvent(event);
         }
     }
 
@@ -1389,6 +1484,7 @@ function startMathGame(container, levelText, topic, gameType, gameLevel, subject
         } else {
             feedback.textContent = "Try again!";
             feedback.style.color = "#f87171"; // Red
+            errors.push(currentQuestion.text); // Log error
             input.select();
         }
     });
