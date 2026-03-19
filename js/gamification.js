@@ -2,18 +2,54 @@ import { auth, db } from '../firebase-config.js';
 
 // Subjects Data (Covering Grade R to University)
 const SUBJECTS = [
-    { id: 'math', title: 'Mathematics', icon: '🧮', desc: 'Arithmetic, Algebra, Calculus & Logic.' },
-    { id: 'science', title: 'Natural Sciences', icon: '🧪', desc: 'Physics, Chemistry & Biology basics.' },
-    { id: 'english', title: 'English', icon: '📚', desc: 'Language, Literature & Poetry.' },
-    { id: 'compsci', title: 'Computer Science', icon: '💻', desc: 'Coding, Algorithms & Hardware.' },
-    { id: 'history', title: 'History', icon: '🏛️', desc: 'Ancient civilizations to Modern History.' },
-    { id: 'geo', title: 'Geography', icon: '🌍', desc: 'Maps, Climate & Physical environments.' },
-    { id: 'acc', title: 'Accounting', icon: '📊', desc: 'Financial records and business management.' },
-    { id: 'lo', title: 'Life Orientation', icon: '🧘', desc: 'Personal growth and social health.' },
-    { id: 'eng', title: 'Engineering', icon: '⚙️', desc: 'Civil, Electrical & Mechanical systems.' },
-    { id: 'arts', title: 'Arts & Culture', icon: '🎨', desc: 'Visual arts, Music and Drama.' },
-    { id: 'med', title: 'Health Sciences', icon: '🩺', desc: 'Anatomy, Medicine & Physiology.' },
-    { id: 'law', title: 'Law', icon: '⚖️', desc: 'Legal systems and Constitution.' }
+    {
+        id: 'math', title: 'Mathematics', icon: '🧮', desc: 'Arithmetic, Algebra, Calculus & Logic.',
+        topics: ['Algebra', 'Calculus', 'Geometry', 'Trigonometry', 'Statistics']
+    },
+    {
+        id: 'science', title: 'Natural Sciences', icon: '🧪', desc: 'Physics, Chemistry & Biology basics.',
+        topics: ['Photosynthesis', 'Cell Structure', 'Newtonian Physics', 'Chemical Reactions', 'The Solar System']
+    },
+    {
+        id: 'english', title: 'English', icon: '📚', desc: 'Language, Literature & Poetry.',
+        topics: ['Shakespeare', 'Poetry Analysis', 'Grammar Fundamentals', 'Creative Writing', 'Literary Theory']
+    },
+    {
+        id: 'compsci', title: 'Computer Science', icon: '💻', desc: 'Coding, Algorithms & Hardware.',
+        topics: ['Data Structures', 'Algorithms', 'Operating Systems', 'Computer Architecture', 'Networking']
+    },
+    {
+        id: 'history', title: 'History', icon: '🏛️', desc: 'Ancient civilizations to Modern History.',
+        topics: ['The French Revolution', 'World War II', 'The Roman Empire', 'The Cold War', 'Ancient Egypt']
+    },
+    {
+        id: 'geo', title: 'Geography', icon: '🌍', desc: 'Maps, Climate & Physical environments.',
+        topics: ['Climate Change', 'World Geography', 'Economic Geography', 'Cartography', 'Environmental Science']
+    },
+    {
+        id: 'acc', title: 'Accounting', icon: '📊', desc: 'Financial records and business management.',
+        topics: ['Financial Accounting', 'Managerial Accounting', 'Auditing', 'Taxation', 'Forensic Accounting']
+    },
+    {
+        id: 'lo', title: 'Life Orientation', icon: '🧘', desc: 'Personal growth and social health.',
+        topics: ['Mental Health', 'Career Planning', 'Social Justice', 'Civic Responsibility', 'Personal Finance']
+    },
+    {
+        id: 'eng', title: 'Engineering', icon: '⚙️', desc: 'Civil, Electrical & Mechanical systems.',
+        topics: ['Thermodynamics', 'Circuit Analysis', 'Fluid Mechanics', 'Structural Engineering', 'Robotics']
+    },
+    {
+        id: 'arts', title: 'Arts & Culture', icon: '🎨', desc: 'Visual arts, Music and Drama.',
+        topics: ['Renaissance Art', 'Classical Music', 'Modern Drama', 'Art History', 'Film Studies']
+    },
+    {
+        id: 'med', title: 'Health Sciences', icon: '🩺', desc: 'Anatomy, Medicine & Physiology.',
+        topics: ['Human Anatomy', 'Physiology', 'Microbiology', 'Immunology', 'Pharmacology']
+    },
+    {
+        id: 'law', title: 'Law', icon: '⚖️', desc: 'Legal systems and Constitution.',
+        topics: ['Constitutional Law', 'Criminal Law', 'Contract Law', 'International Law', 'Human Rights Law']
+    }
 ];
 
 // --- CONFIGURATION ---
@@ -227,8 +263,27 @@ function openConfig(subject) {
     levelSelect.value = '10'; // Default
     document.getElementById('game-topic').value = '';
     document.getElementById('game-type').value = 'Quiz';
+
+    // Clear any existing topic suggestions
+    document.getElementById('game-setup-form').querySelectorAll('.topic-suggestion-btn').forEach(btn => btn.remove());
+
     document.getElementById('game-topic').placeholder = "e.g. Algebra";
     document.getElementById('topic-label').textContent = "Topic";
+
+    // Display topic suggestions (if available)
+    let topicsHTML = '<p style="color:#64748b; font-style:italic; margin-bottom:1rem;">Suggested Topics:</p>';
+    if (subject.topics && subject.topics.length > 0) {
+        topicsHTML = subject.topics.map(topic => `<button class="topic-suggestion-btn" style="background:#334155; border:none; color:white; padding:0.5rem 1rem; border-radius:0.5rem; cursor:pointer; margin:0.2rem;" onclick="document.getElementById('game-topic').value = '${topic}';">${topic}</button>`).join('');
+    } else {
+        topicsHTML = '<p style="color:#f87171">No topics found for this subject.</p>';
+    }
+
+    // Create topics UI
+    const topicContainer = document.createElement('div');
+    topicContainer.innerHTML = topicsHTML;
+
+    // Insert into DOM
+    document.getElementById('game-setup-form').appendChild(topicContainer);
 
     switchView('view-config');
 }

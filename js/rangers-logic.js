@@ -1,22 +1,53 @@
 export function startRangersGame(container, level, onWin) {
-    // 1. Setup UI
+    // 1. Setup Enhanced UI
     container.innerHTML = `
-        <div style="display: flex; gap: 20px; flex-wrap: wrap; justify-content: center; color: white; max-width: 800px; margin: 0 auto;">
-            <div style="background: #334155; padding: 10px; border-radius: 8px;">
-                <div id="grid-container" style="display: grid; gap: 2px;"></div>
-            </div>
-            <div id="controls" style="flex: 1; min-width: 300px; display: flex; flex-direction: column; gap: 10px;">
-                <h3 style="margin:0; color: #4ade80;">Mission Control: Level ${level}</h3>
-                <p style="font-size: 0.9rem; color: #cbd5e1;">Guide the Rover (🚜) to the Flag (🏁).</p>
-                <div style="background: #1e293b; padding: 10px; border-radius: 4px; font-size: 0.85rem; color: #94a3b8; font-family: monospace;">
-                    Valid: forward(n), backward(n), left(), right()
+        <div style="display: grid; grid-template-columns: 1fr 350px; gap: 20px; color: white; max-width: 1000px; margin: 0 auto; font-family: 'Inter', sans-serif;">
+            
+            <div style="display: flex; flex-direction: column; align-items: center; gap: 15px;">
+                <div style="background: #334155; padding: 15px; border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.3);">
+                    <div id="grid-container" style="display: grid; gap: 4px; border-radius: 4px; overflow: hidden;"></div>
                 </div>
-                <textarea id="command-input" style="height: 120px; background: #0f172a; color: #4ade80; font-family: monospace; padding: 10px; border: 1px solid #475569; border-radius: 4px; resize: none;" placeholder="forward(2)\nright()"></textarea>
-                <button id="run-btn" class="play-btn">Execute Mission</button>
-                <div id="rangers-feedback" style="min-height: 24px; color: #f87171; font-weight: bold; font-size: 0.9rem;"></div>
+                <div id="rangers-feedback" style="height: 30px; padding: 5px 20px; border-radius: 20px; background: rgba(15, 23, 42, 0.5); font-weight: 600; text-align: center;"></div>
+            </div>
+
+            <div id="controls" style="background: #1e293b; padding: 20px; border-radius: 12px; display: flex; flex-direction: column; gap: 15px; border: 1px solid #334155;">
+                <div style="display:flex; justify-content: space-between; align-items: center;">
+                    <h3 style="margin:0; color: #4ade80; font-size: 1.2rem;">Mission Control</h3>
+                    <span style="background:#0f172a; padding: 2px 8px; border-radius: 4px; font-size: 0.8rem;">Level ${level}</span>
+                </div>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+                    <button class="cmd-btn" onclick="document.getElementById('command-input').value += 'forward(1)\\n'">⬆️ Forward</button>
+                    <button class="cmd-btn" onclick="document.getElementById('command-input').value += 'backward(1)\\n'">⬇️ Backward</button>
+                    <button class="cmd-btn" onclick="document.getElementById('command-input').value += 'left()\\n'">↩️ Turn Left</button>
+                    <button class="cmd-btn" onclick="document.getElementById('command-input').value += 'right()\\n'">↪️ Turn Right</button>
+                </div>
+
+                <div style="position: relative;">
+                    <textarea id="command-input" 
+                        style="width: 100%; height: 180px; background: #0f172a; color: #4ade80; font-family: 'Fira Code', monospace; padding: 12px; border: 1px solid #475569; border-radius: 8px; resize: none; font-size: 1rem; line-height: 1.5;" 
+                        placeholder="Type your mission script here..."></textarea>
+                </div>
+
+                <button id="run-btn" class="play-btn" style="width: 100%; padding: 12px; font-weight: bold; font-size: 1.1rem; transition: transform 0.2s;">🚀 LAUNCH ROVER</button>
+                
+                <button id="clear-btn" style="background: transparent; border: 1px solid #475569; color: #94a3b8; padding: 5px; border-radius: 4px; cursor: pointer; font-size: 0.8rem;">Clear Script</button>
             </div>
         </div>
+
+        <style>
+            .cmd-btn {
+                background: #334155; border: 1px solid #475569; color: white; padding: 8px; border-radius: 6px; cursor: pointer; font-size: 0.85rem; transition: all 0.2s;
+            }
+            .cmd-btn:hover { background: #475569; border-color: #4ade80; }
+            .play-btn:active { transform: scale(0.95); }
+            .play-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+            #grid-container div { transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
+        </style>
     `;
+
+    // Add listener for clear button
+    document.getElementById('clear-btn').onclick = () => document.getElementById('command-input').value = '';
 
     const grid = document.getElementById('grid-container');
     const input = document.getElementById('command-input');
@@ -35,13 +66,28 @@ export function startRangersGame(container, level, onWin) {
         grid.style.gridTemplateRows = `repeat(${gridHeight}, 60px)`;
 
         // Random start position (keep away from center slightly to allow obstacles)
-        tankPos = { x: Math.floor(Math.random() * gridWidth), y: Math.floor(Math.random() * gridHeight) };
+        tankPos = { x: Math.floor(Math.random() * gridWidth), y: Math.floor(Math.random() * gridHeight) };       
         
         // Ensure goal is different from start
         do {
             goalPos = { x: Math.floor(Math.random() * gridWidth), y: Math.floor(Math.random() * gridHeight) };
         } while (goalPos.x === tankPos.x && goalPos.y === tankPos.y);
 
+        // --- Dynamic Obstacle Generation ---
+        const numObstacles = Math.floor(level * 0.75); // Scale obstacles with level
+        obstacles = [];
+        for (let i = 0; i < numObstacles; i++) {
+            let newObstacle;
+            do {
+                newObstacle = { x: Math.floor(Math.random() * gridWidth), y: Math.floor(Math.random() * gridHeight) };
+                // Ensure not start/goal and not overlapping
+            } while (
+                (newObstacle.x === tankPos.x && newObstacle.y === tankPos.y) ||
+                (newObstacle.x === goalPos.x && newObstacle.y === goalPos.y) ||
+                obstacles.some(o => o.x === newObstacle.x && o.y === newObstacle.y)
+            );
+            obstacles.push(newObstacle);
+        }
         // Obstacles (avoid start and goal)
         obstacles = level > 3 ? [{x: 2, y: 2}, {x: 2, y: 3}, {x: 3, y: 1}].filter(o => 
             (o.x !== tankPos.x || o.y !== tankPos.y) && (o.x !== goalPos.x || o.y !== goalPos.y)
