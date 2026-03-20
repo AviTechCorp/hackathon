@@ -1,0 +1,50 @@
+body {
+    /* Example: Solid background color */
+    /* background-color: #f0f0f0; */
+
+    /* Example: Gradient background */
+    /* background: linear-gradient(to right, #4a90e2, #63b8ff); */
+
+    /* Example: Background image */
+     background-image: url('https://plus.unsplash.com/premium_photo-1769160344371-77fa0941c7a0?q=80&w=1632&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D');
+    background-size: cover; /* or contain, or specific dimensions */
+    background-repeat: no-repeat;
+    background-attachment: fixed; /* Keeps the background fixed during scrolling */
+}
+
+/* Basic styling for the toast notification */
+.toast {
+    position: fixed;
+    top: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    background-color: #333;
+    color: #fff;
+    padding: 10px 20px;
+    border-radius: 5px;
+    z-index: 1000; /* Ensure it's on top of everything */
+    opacity: 0; /* Start hidden */
+    transition: opacity 0.3s ease-in-out; /* Fade in/out */
+}
+
+/* Example: Style for images */
+/*img {*/
+/*    max-width: 100%; /* Ensures images don't exceed their container */
+/*    height: auto;       /* Maintains aspect ratio */
+
+.main-content {
+    background-color: rgba(255, 255, 255, 0.8); /* Semi-transparent white */
+    padding: 20px;
+    border-radius: 10px;
+}
+
+.logout {
+    background-color: #f44336; /* Red */
+    color: white;
+    padding: 10px 15px;
+    text-align: center;
+    text-decoration: none;
+    display: inline-block;
+    border-radius: 5px;
+    transition: background-color 0.3s;
+}
