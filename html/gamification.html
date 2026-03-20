@@ -5,11 +5,11 @@
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <meta name="description" content="Play educational games, track your XP, and level up your skills in the EduFlow Games Arena.">
         <title>Edu-Tech | Games Arena</title>
-        <link rel="stylesheet" href="../css/gamification.css">
         <!-- Google Fonts: Inter -->
         <link rel="preconnect" href="https://fonts.googleapis.com">
         <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
         <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+        <link rel="stylesheet" href="../css/gamification.css">
         <!-- MathGames API -->
         <script src="https://cdn.mathgames.com/api/dist/latest/mathgames-api.js"></script>
     </head>
@@ -19,7 +19,8 @@
             <aside class="sidebar">
                 <div class="logo">EduFlow</div>
                 <nav>
-                    <a href="../index.html" class="nav-item">📚 Learning Path</a>
+                    <a href="learning_path.html" class="nav-item">📚 Learning Path</a>
+                    
                     <a href="#" class="nav-item active">🎮 Games Arena</a>
                     <a href="#" id="logout-btn" class="nav-item logout">🚪 Sign Out</a>
                 </nav>
@@ -61,7 +62,7 @@
                         
                         <form id="game-setup-form">
                             <div class="form-group">
-                                <label for="education-level">Grade / Level</label>
+                                <label for="education-level">Grade</label>
                                 <select id="education-level" required>
                                     <!-- Options injected by JS -->
                                 </select>

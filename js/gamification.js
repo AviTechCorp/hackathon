@@ -57,7 +57,9 @@ class GameLoader {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
+   const logoutBtn = document.getElementById('logout-btn');
     // Logout Handler
+     if (logoutBtn)
     document.getElementById('logout-btn').addEventListener('click', (e) => {
         e.preventDefault();
         auth.signOut().then(() => {
@@ -133,6 +135,7 @@ async function loadUserProfile(uid) {
         xpDisplay.textContent = userData.xp || 0;
 
         // Render Subjects Grid
+       
         renderSubjects(subjectsGrid);
 
     } catch (error) {
@@ -142,6 +145,29 @@ async function loadUserProfile(uid) {
 }
 
 function renderSubjects(container) {
+    function addResetButton(container) {
+    const resetButton = document.createElement('button');
+    resetButton.textContent = 'Reset XP & Level';
+    resetButton.className = 'play-btn';
+    resetButton.style.marginTop = '1rem';
+    resetButton.addEventListener('click', async () => {
+        if (confirm('Are you sure you want to reset your XP and level? This cannot be undone.')) {
+            await resetXPAndLevel();
+        }
+    });
+    container.appendChild(resetButton);
+}
+
+    let existingResetButton = document.getElementById('reset-xp-button');
+    if(existingResetButton) {
+        container.appendChild(existingResetButton);
+    } else {
+        addResetButton(container)
+    }
+
+
+
+
     container.innerHTML = '';
 
     SUBJECTS.forEach(subj => {
@@ -164,6 +190,37 @@ function renderSubjects(container) {
         
         container.appendChild(card);
     });
+}
+
+async function resetXPAndLevel() {
+    if (!auth.currentUser) {
+        console.error("No user is signed in. Cannot reset data.");
+        return;
+    }
+
+    const userDocRef = db.collection("users").doc(auth.currentUser.uid);
+    
+    // Reset values
+    const resetData = {
+        xp: 0,
+        level: 1,
+        completedNodes: [],
+        levels: {}
+    };
+
+    try {
+        await userDocRef.set(resetData); // Overwrite with reset data
+
+        // Update local state
+        currentUserProfile.xp = 0;
+        currentUserProfile.level = 1;
+        currentUserProfile.completedNodes = [];
+        
+        // Update UI immediately
+        updateStatsUI();
+    } catch (error) {
+        console.error("Error resetting XP and level:", error);
+    }
 }
 
 let selectedSubject = null;
