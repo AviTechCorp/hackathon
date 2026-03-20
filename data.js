@@ -16,7 +16,16 @@ const seedData = {
             correct: "Correct!",
             incorrect: "Try again.",
             next: "Next",
-            finish: "Finish & Collect XP"
+            finish: "Finish & Collect XP",
+            //Grade R terms
+            circle: "Circle",
+            triangle: "Triangle",
+            square: "Square",
+            ontopof: "On Top Of",
+            under: "Under",
+            behind: "Behind",
+            nextto: "Next To",
+            taller: "Taller"
         },
         es: {
             dashboardTitle: "Tu Ruta de Aprendizaje",
@@ -44,7 +53,7 @@ const seedData = {
                 es: { title: "Matemáticas Básicas", desc: "Introducción a la suma." }
             },
             quiz: {
-                question: "2 + 2 = ?",
+                question: "1 + 1 = ?",
                 options: ["3", "4", "5", "22"],
                 correctIndex: 1
             },
@@ -97,6 +106,34 @@ const seedData = {
                 correctIndex: 2
             },
             nextNodes: []
+        }
+    ],
+        gradeRNodes: [
+        {
+            id: "r_node_1",
+            type: "lesson",
+            xp: 25,
+            requiredNode: null,
+            content: {
+                en: { title: "Counting 1-5", desc: "Learn to count from 1 to 5." },
+                es: { title: "Contando 1-5", desc: "Aprende a contar del 1 al 5." }
+            },
+            quiz: {
+                question: "How many fingers on one hand?",
+                options: ["3", "4", "5", "6"],
+                correctIndex: 2
+            },
+             nextNodes: ["r_node_2"]
+        },
+        {
+            id: "r_node_2",
+            type: "lesson",
+            xp: 30,
+            requiredNode: "r_node_1",
+            content: {
+                en: { title: "Recognizing Shapes", desc: "Identify basic 2D shapes." },
+                es: { title: "Reconociendo Formas", desc: "Identifica formas 2D básicas." }
+            },
         }
     ]
 };

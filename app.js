@@ -78,6 +78,7 @@ class EduApp {
         }
     }
 
+
     async fetchUserData(uid) {
         const userDocRef = db.collection("users").doc(uid);
         const userDoc = await userDocRef.get();
@@ -263,7 +264,7 @@ async function seedDatabase() {
         translations: {
             en: { dashboardTitle: "Your Learning Path", start: "Start Lesson", locked: "Locked", completed: "Completed", pointsLabel: "XP", correct: "Correct!", incorrect: "Try again.", next: "Next", finish: "Finish & Collect XP" },
             es: { dashboardTitle: "Tu Ruta de Aprendizaje", start: "Comenzar Lección", locked: "Bloqueado", completed: "Completado", pointsLabel: "XP", correct: "¡Correcto!", incorrect: "Inténtalo de nuevo.", next: "Siguiente", finish: "Terminar y Recoger XP" }
-        },
+       },
         nodes: [
             { id: "node_1", type: "lesson", xp: 50, requiredNode: null, content: { en: { title: "Math Basics", desc: "Introduction to addition." }, es: { title: "Matemáticas Básicas", desc: "Introducción a la suma." } }, quiz: { question: "2 + 2 = ?", options: ["3", "4", "5", "22"], correctIndex: 1 }, nextNodes: ["node_2"] },
             { id: "node_2", type: "lesson", xp: 100, requiredNode: "node_1", content: { en: { title: "Simple Multiplication", desc: "Learning to multiply." }, es: { title: "Multiplicación Simple", desc: "Aprendiendo a multiplicar." } }, quiz: { question: "3 x 3 = ?", options: ["6", "9", "12", "33"], correctIndex: 1 }, nextNodes: ["node_3_adv", "node_3_std"] },

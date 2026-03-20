@@ -55,6 +55,11 @@ footer {
     margin-top: auto;
 }
 
+.node-card.locked {
+    pointer-events: none;
+    opacity: 0.6;
+}
+
 /* App Container (Dashboard) */
 #app-container {
     max-width: 1200px;
@@ -80,18 +85,77 @@ footer {
 /* Toast */
 #toast-region {
     position: fixed;
-    bottom: 20px;
+        bottom: 50px;
     right: 20px;
     z-index: 1000;
 }
-.toast {
+    .toast {
+        background: #333;
+        color: white;
+        padding: 12px 24px;
+        border-radius: 4px;
+        margin-top: 10px;
+        animation: fadeIn 0.3s;
+    }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+/* Styling for chat */
+#chat-container {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    width: 300px;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+    overflow: hidden;
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+    z-index: 1000;
+    background-color: white;
+    display: flex;
+    flex-direction: column;
+    height: 400px;
+    transition: transform 0.3s ease-in-out;
+    transform: translateY(calc(400px - 50px));
+}
+
+#chat-container.open {
+    transform: translateY(0);
+		width: 400px;
+}
+
+#chat-trigger {
+    background-color: #6366f1;
+    color: white;
+    padding: 10px 15px;
+    border: none;
+    border-radius: 5px 5px 0 0;
+    cursor: pointer;
+    width: 100%;
+    text-align: left;
+}
+
+#chat-trigger:hover {
+    background-color: #4f46e5;
+}
+
+#chat-container p {
+    padding: 10px;
+    margin: 0;
+		color: black;
+    font-size: 0.9em;
+    line-height: 1.4;
+		word-break: break-word;
+}
+
+#chat-log {
+    flex-grow: 1;
     background: #333;
     color: white;
     padding: 12px 24px;
     border-radius: 4px;
     margin-top: 10px;
     animation: fadeIn 0.3s;
-}
+} 
 @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 
 /* --- Landing Page Styles --- */

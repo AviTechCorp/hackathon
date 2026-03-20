@@ -86,6 +86,13 @@
             </section>
         </div>
 
+        <!-- Chat Dialogue -->
+        <div id="chat-container">
+            <button id="chat-trigger">💬 Chat</button>
+            <p>This is the chat dialogue content.</p>  <!-- Add this line -->
+        </div>
+
+
         <!-- Views will be injected here by app.js -->
         <div id="app-container"></div>
     </main>
@@ -106,4 +113,20 @@
     <script type="module" src="js/firebase-config.js"></script>
     <script type="module" src="app.js"></script>
 </body>
+<script>
+	document.addEventListener('DOMContentLoaded', function() {
+    const chatContainer = document.getElementById('chat-container');
+    const chatTrigger = document.getElementById('chat-trigger');
+
+    chatTrigger.addEventListener('click', function() {
+			console.log('Chat trigger clicked!');
+      chatContainer.classList.toggle('open');
+			console.log('Chat container class toggled.  Classlist is now: ' + chatContainer.classList);
+    });
+  });
+</script>
+
+
+
+
 </html>

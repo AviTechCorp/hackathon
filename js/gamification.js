@@ -2,54 +2,11 @@ import { auth, db } from '../firebase-config.js';
 
 // Subjects Data (Covering Grade R to University)
 const SUBJECTS = [
-    {
-        id: 'math', title: 'Mathematics', icon: '🧮', desc: 'Arithmetic, Algebra, Calculus & Logic.',
-        topics: ['Algebra', 'Calculus', 'Geometry', 'Trigonometry', 'Statistics']
-    },
-    {
-        id: 'science', title: 'Natural Sciences', icon: '🧪', desc: 'Physics, Chemistry & Biology basics.',
-        topics: ['Photosynthesis', 'Cell Structure', 'Newtonian Physics', 'Chemical Reactions', 'The Solar System']
-    },
-    {
-        id: 'english', title: 'English', icon: '📚', desc: 'Language, Literature & Poetry.',
-        topics: ['Shakespeare', 'Poetry Analysis', 'Grammar Fundamentals', 'Creative Writing', 'Literary Theory']
-    },
-    {
-        id: 'compsci', title: 'Computer Science', icon: '💻', desc: 'Coding, Algorithms & Hardware.',
-        topics: ['Data Structures', 'Algorithms', 'Operating Systems', 'Computer Architecture', 'Networking']
-    },
-    {
-        id: 'history', title: 'History', icon: '🏛️', desc: 'Ancient civilizations to Modern History.',
-        topics: ['The French Revolution', 'World War II', 'The Roman Empire', 'The Cold War', 'Ancient Egypt']
-    },
-    {
-        id: 'geo', title: 'Geography', icon: '🌍', desc: 'Maps, Climate & Physical environments.',
-        topics: ['Climate Change', 'World Geography', 'Economic Geography', 'Cartography', 'Environmental Science']
-    },
-    {
-        id: 'acc', title: 'Accounting', icon: '📊', desc: 'Financial records and business management.',
-        topics: ['Financial Accounting', 'Managerial Accounting', 'Auditing', 'Taxation', 'Forensic Accounting']
-    },
-    {
-        id: 'lo', title: 'Life Orientation', icon: '🧘', desc: 'Personal growth and social health.',
-        topics: ['Mental Health', 'Career Planning', 'Social Justice', 'Civic Responsibility', 'Personal Finance']
-    },
-    {
-        id: 'eng', title: 'Engineering', icon: '⚙️', desc: 'Civil, Electrical & Mechanical systems.',
-        topics: ['Thermodynamics', 'Circuit Analysis', 'Fluid Mechanics', 'Structural Engineering', 'Robotics']
-    },
-    {
-        id: 'arts', title: 'Arts & Culture', icon: '🎨', desc: 'Visual arts, Music and Drama.',
-        topics: ['Renaissance Art', 'Classical Music', 'Modern Drama', 'Art History', 'Film Studies']
-    },
-    {
-        id: 'med', title: 'Health Sciences', icon: '🩺', desc: 'Anatomy, Medicine & Physiology.',
-        topics: ['Human Anatomy', 'Physiology', 'Microbiology', 'Immunology', 'Pharmacology']
-    },
-    {
-        id: 'law', title: 'Law', icon: '⚖️', desc: 'Legal systems and Constitution.',
-        topics: ['Constitutional Law', 'Criminal Law', 'Contract Law', 'International Law', 'Human Rights Law']
-    }
+    { id: 'math', title: 'Mathematics', icon: '🧮', desc: 'Arithmetic, basic shapes.' },
+];
+const GAME_TYPES = [
+    { val: 'Snake', text: '🐍 Snake Game' },
+    { val: 'Pattern', text: '🧩 Pattern Recognition' },
 ];
 
 // --- CONFIGURATION ---
@@ -68,7 +25,6 @@ class GameLoader {
     static async loadAndPlay(type, container, level, onWin, onExit) {
         const gameModules = {
             'Pattern': { path: './pattern-game.js', exportName: 'startPatternGame' },
-            'PingPong': { path: './ping-pong.js', exportName: 'startPingPong' },
             'Balloon': { path: './balloon-popper.js', exportName: 'startBalloonPopper' },
             'Rangers': { path: './rangers-logic.js', exportName: 'startRangersGame' }
         };
@@ -120,20 +76,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
     document.getElementById('back-to-config-from-levels').addEventListener('click', () => {
         switchView('view-config');
-    });
-
-    // Dynamic Label for University Course
-    document.getElementById('education-level').addEventListener('change', (e) => {
-        const label = document.getElementById('topic-label');
-        const input = document.getElementById('game-topic');
-        
-        if (e.target.value === 'uni') {
-            label.textContent = "Course Name";
-            input.placeholder = "e.g. CS101: Data Structures";
-        } else {
-            label.textContent = "Topic";
-            input.placeholder = "e.g. Algebra, Photosynthesis";
-        }
     });
 
     // Form Submit
@@ -229,6 +171,15 @@ let selectedSubject = null;
 function openConfig(subject) {
     selectedSubject = subject;
     const levelSelect = document.getElementById('education-level');
+    
+    if (!levelSelect) {
+        console.error("Element with ID 'education-level' not found!");
+        return; // Or handle the error in a more appropriate way
+    }
+    if (!levelSelect) {
+        console.error("Element with ID 'education-level' not found!");
+        return; // Or handle the error in a more appropriate way
+    }
     const configTitle = document.getElementById('config-title');
     
     configTitle.textContent = `Setup: ${subject.title}`;
@@ -236,20 +187,10 @@ function openConfig(subject) {
     // Populate Grades (R to Uni)
     levelSelect.innerHTML = '';
     const levels = [
-        { val: 'R', text: 'Grade R' },
-        { val: '1', text: 'Grade 1' },
-        { val: '2', text: 'Grade 2' },
-        { val: '3', text: 'Grade 3' },
         { val: '4', text: 'Grade 4' },
         { val: '5', text: 'Grade 5' },
         { val: '6', text: 'Grade 6' },
         { val: '7', text: 'Grade 7' },
-        { val: '8', text: 'Grade 8' },
-        { val: '9', text: 'Grade 9' },
-        { val: '10', text: 'Grade 10' },
-        { val: '11', text: 'Grade 11' },
-        { val: '12', text: 'Grade 12' },
-        { val: 'uni', text: 'University / College' }
     ];
 
     levels.forEach(lvl => {
@@ -260,15 +201,12 @@ function openConfig(subject) {
     });
 
     // Reset inputs
-    levelSelect.value = '10'; // Default
-    document.getElementById('game-topic').value = '';
-    document.getElementById('game-type').value = 'Quiz';
-
-    // Clear any existing topic suggestions
-    document.getElementById('game-setup-form').querySelectorAll('.topic-suggestion-btn').forEach(btn => btn.remove());
-
-    document.getElementById('game-topic').placeholder = "e.g. Algebra";
-    document.getElementById('topic-label').textContent = "Topic";
+    levelSelect.value = 'R'; // Default
+    const gameTypeSelect = document.getElementById('game-type');
+    
+    // Check if the selected grade is R, 1, 2, or 3
+    const selectedGrade = levelSelect.value;
+    gameTypeSelect.innerHTML = `<option value="Snake">🐍 Snake Game</option> <option value="Pattern">🧩 Pattern Recognition</option> <option value="Balloon">🎈 Balloon Popper</option> <option value="Rangers">🚜 Ranger's Logic</option>`;
 
     // Display topic suggestions (if available)
     let topicsHTML = '<p style="color:#64748b; font-style:italic; margin-bottom:1rem;">Suggested Topics:</p>';
@@ -293,8 +231,15 @@ function handleConfigSubmit(e) {
     
     // Store configuration
     currentConfig.educationLevel = document.getElementById('education-level').options[document.getElementById('education-level').selectedIndex].text;
-    currentConfig.type = document.getElementById('game-type').value;
-    currentConfig.topic = document.getElementById('game-topic').value.trim() || "General Knowledge";
+    currentConfig.type = document.getElementById('game-type').value;;
+
+     // For Grade R-3, force game type to Balloon Popper
+    const grade = currentConfig.educationLevel.replace('Grade ', '');
+    if (grade === 'R' || parseInt(grade) <= 3) {
+        currentConfig.type = 'Balloon';
+        const gameTypeSelect = document.getElementById('game-type');
+        gameTypeSelect.value = 'Balloon';
+    }
 
     renderLevels();
     switchView('view-levels');
@@ -303,7 +248,12 @@ function handleConfigSubmit(e) {
 function renderLevels() {
     const grid = document.getElementById('levels-grid');
     grid.innerHTML = '';
-    
+
+    const grade = currentConfig.educationLevel.replace('Grade ', '');
+    //If is grade R-3, show only the ballon game.
+     if (grade === 'R' || parseInt(grade) <= 3) {
+        currentConfig.type = 'Balloon';
+     }
     let maxUnlocked = 1;
     if (currentUserProfile && selectedSubject && currentUserProfile.levels && currentConfig.type) {
         const key = `${selectedSubject.id}_${currentConfig.type}_${currentConfig.topic}`;
@@ -316,7 +266,7 @@ function renderLevels() {
         // Logic: Unlock based on user profile
         const isLocked = i > maxUnlocked; 
 
-        btn.className = `level-card ${isLocked ? 'locked' : ''}`;
+        btn.className = `level-card ${isLocked || currentConfig.type !== 'Balloon' ? 'locked' : ''}`;
         btn.innerHTML = `${i} ${isLocked ? '<span class="lock-icon">🔒</span>' : ''}`;
         
         if (!isLocked) {
@@ -365,7 +315,9 @@ async function startGame(gameLevel) {
     }, 100);
 
     // Fetch Content from Wikipedia API
-    const contentData = await fetchContentForTopic(currentConfig.topic);
+    let contentData = null;
+    if (currentConfig.topic && currentConfig.topic.trim() !== "")
+        contentData = await fetchContentForTopic(currentConfig.topic);
     
     // --- AI CONTENT GENERATION ---
     // If API Key is present, try to generate questions dynamically
@@ -423,7 +375,7 @@ async function startGame(gameLevel) {
             // Use the new Generic Engine (Suggestion 1)
             startUniversalQuizEngine(container, currentConfig.educationLevel, currentConfig.topic, currentConfig.type, gameLevel, selectedSubject.title);
         }
-    } else if (['english', 'law', 'arts'].includes(subj)) {
+    } else if (['english', 'coding and robotics', 'arts'].includes(subj)) {
         // Language & Text Games
         startWordGame(container, currentConfig.educationLevel, currentConfig.topic, currentConfig.type, gameLevel, selectedSubject.title, contentData);
     } else {
@@ -496,6 +448,10 @@ async function generateAIQuestions(topic, level, subject) {
 
 async function fetchContentForTopic(topic) {
     try {
+        if (!topic || topic.trim() === "") {
+            console.warn("Empty topic provided, skipping Wikipedia API call.");
+            return null;
+        }
         const res = await fetch(`https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(topic)}`);
         if (!res.ok) return null;
         const data = await res.json();
@@ -510,7 +466,6 @@ function renderLoadingScreen(container, subject, topic) {
     container.innerHTML = `
         <div style="text-align:center; padding:3rem; color: #cbd5e1;">
             <div style="font-size:3rem; margin-bottom:1rem; animation: spin 2s linear infinite;">🌍</div>
-            <h3>Searching Knowledge Base...</h3>
             <p>Extracting content for <strong>${subject}</strong>: <em>${topic}</em></p>
             <div style="width:200px; height:4px; background:#334155; margin:1rem auto; border-radius:2px; overflow:hidden;">
                 <div style="width:0%; height:100%; background:#6366f1; transition:width 2s ease-in-out;" id="load-bar"></div>
@@ -525,218 +480,16 @@ function startContentQuizGame(container, levelText, topic, gameType, gameLevel, 
     let qIndex = 0;
 
     // Generate Questions from Content Data
-    let questions = [];
+
     
     if (aiQuestions && aiQuestions.length > 0) {
-        // Use AI Generated Questions
-        questions = aiQuestions;
-    } else if (contentData) {
-        // Fallback: Generate from Wikipedia text
-        const sentences = contentData.split('. ').filter(s => s.length > 20 && s.length < 150);
-        const words = contentData.split(' ').filter(w => w.length > 5).map(w => w.replace(/[^a-zA-Z]/g, ''));
-        
-        sentences.forEach(sentence => {
-            const wordsInSentence = sentence.split(' ');
-            const targetWord = wordsInSentence.find(w => w.length > 6);
-            
-            if (targetWord) {
-                const cleanTarget = targetWord.replace(/[^a-zA-Z0-9-]/g, '');
-                const qText = sentence.replace(targetWord, '_________');
-                
-                const opts = [cleanTarget];
-                while(opts.length < 4) {
-                    const randomWord = words[Math.floor(Math.random() * words.length)];
-                    if (randomWord && !opts.includes(randomWord)) opts.push(randomWord);
-                }
-                const shuffled = opts.sort(() => 0.5 - Math.random());
-                
-                questions.push({
-                    q: qText,
-                    options: shuffled,
-                    correct: shuffled.indexOf(cleanTarget)
-                });
-            }
-        });
     }
-
-    if (questions.length === 0) {
-        questions = [
-            {
-                q: `Which key concept is foundational to understanding <strong>${topic}</strong>?`,
-                options: ["The Primary Theory", "Historical Relevance", "Abstract Application", "Critical Analysis"],
-                correct: 0
-            },
-            {
-                q: `True or False: <strong>${topic}</strong> is relevant to ${subjectTitle}.`,
-                options: ["True", "False"],
-                correct: 0
-            }
-        ];
-    }
-
-    questions = questions.slice(0, 5);
-
-    function renderQuestion() {
-        if (qIndex >= questions.length) {
-            container.innerHTML = `
-                <div style="text-align:center; padding:2rem; color:white;">
-                    <h2>🎉 Topic Complete!</h2>
-                    <p>You have demonstrated knowledge in <strong>${topic}</strong>.</p>
-                    <h3>Score: ${score} XP</h3>
-                    <button id="finish-quiz" class="play-btn" style="margin-top:1rem; width:auto;">Return to Menu</button>
-                </div>
-            `;
-            document.getElementById('finish-quiz').addEventListener('click', () => {
-                updateUserXP(score);
-                unlockNextLevel(gameLevel);
-                switchView('view-levels');
-            });
-            return;
-        }
-
-        const q = questions[qIndex];
-        
-        container.innerHTML = `
-            <div style="max-width:600px; margin:0 auto; text-align:center;">
-                <div style="display:flex; justify-content:space-between; color:#94a3b8; margin-bottom:1rem;">
-                    <span>Topic: ${topic}</span>
-                    <span>XP: ${score}</span>
-                </div>
-                <h3 style="color:white; font-size:1.4rem; margin-bottom:2rem; line-height:1.5;">${q.q}</h3>
-                <div style="display:grid; gap:1rem;">
-                    ${q.options.map((opt, i) => `
-                        <button class="play-btn quiz-opt" data-idx="${i}" style="background:var(--surface-color); color:var(--text-main); border:1px solid var(--border-color); text-align:left;">
-                            ${opt}
-                        </button>
-                    `).join('')}
-                </div>
-            </div>
-        `;
-
-        container.querySelectorAll('.quiz-opt').forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                const idx = parseInt(e.target.dataset.idx);
-                if (idx === q.correct) {
-                    score += 50;
-                    e.target.style.background = "#4ade80"; // Green
-                } else {
-                    e.target.style.background = "#f87171"; // Red
-                }
-                
-                setTimeout(() => {
-                    qIndex++;
-                    renderQuestion();
-                }, 800);
-            });
-        });
-    }
-
-    renderQuestion();
-}
-
-function startWordGame(container, levelText, topic, gameType, gameLevel, subjectTitle, contentData) {
-    const tier = getTier(levelText);
-    let gameMode = "scramble";
-    
-    // 1. Configure based on Educational Tier
-    if (tier === 'foundation') {
-        // Phonics / Sight Words
-        const sightWords = ["CAT", "DOG", "SUN", "MOM", "DAD", "YES", "NO", "RUN"];
-        var keyword = sightWords[Math.floor(Math.random() * sightWords.length)];
-    } else if (tier === 'tertiary') {
-        // Linguistics & Technical Writing (Regex)
-        startRegexGame(container, topic, gameLevel);
-        return;
-    } else {
-        // Intermediate/High School: Content Vocabulary
-        var keyword = topic.split(' ')[0].toUpperCase();
-        if (contentData) {
-            const bigWords = contentData.split(' ').filter(w => w.length > (tier === 'highschool' ? 6 : 4)).map(w => w.replace(/[^a-zA-Z]/g, '').toUpperCase());
-            if (bigWords.length > 0) keyword = bigWords[Math.floor(Math.random() * bigWords.length)];
-        }
-    }
-    
-    const scrambled = keyword.split('').sort(() => 0.5 - Math.random()).join(' ');
-
-    container.innerHTML = `
-        <div style="text-align:center; color:white;">
-            <h3 style="color:#94a3b8;">${subjectTitle}: ${tier === 'foundation' ? 'Phonics' : 'Vocabulary'}</h3>
-            <p>${tier === 'foundation' ? 'What word is this?' : `Unscramble the keyword related to <strong>${topic}</strong>:`}</p>
-            
-            <h1 style="font-size:3.5rem; letter-spacing:0.5rem; margin:2rem 0; font-family:monospace;">${scrambled}</h1>
-            
-            <input type="text" id="word-input" placeholder="Type answer..." autocomplete="off" 
-                style="padding:1rem; font-size:1.5rem; text-align:center; border-radius:0.5rem; border:none; width:250px; text-transform:uppercase;">
-            
-            <br><br>
-            <button id="check-word" class="play-btn" style="width:auto;">Submit Answer</button>
-            <p id="word-feedback" style="margin-top:1rem; height:20px; font-weight:bold;"></p>
-        </div>
-    `;
-
-    document.getElementById('check-word').addEventListener('click', () => {
-        const input = document.getElementById('word-input').value.toUpperCase();
-        const feedback = document.getElementById('word-feedback');
-        
-        if (input === keyword || (tier === 'foundation' && input.includes(keyword))) {
-            feedback.textContent = "Correct! Well done.";
-            feedback.style.color = "#4ade80";
-            updateUserXP(50);
-            unlockNextLevel(gameLevel);
-            setTimeout(() => switchView('view-levels'), 1500);
-        } else {
-            feedback.textContent = "Try again.";
-            feedback.style.color = "#f87171";
-        }
-    });
-}
-
-function startRegexGame(container, topic, gameLevel) {
-    const patterns = [
-        { desc: "Match any 3 digits", pattern: /^\d{3}$/, hint: "e.g. 123" },
-        { desc: "Match a localized greeting", pattern: /^(Hello|Hola|Bonjour)$/i, hint: "Hello, Hola, or Bonjour" },
-        { desc: "Match an email suffix", pattern: /@gmail\.com$/, hint: "Ends with @gmail.com" },
-        { desc: "Match capital letters only", pattern: /^[A-Z]+$/, hint: "ABC (no numbers or lowercase)" }
-    ];
-    const challenge = patterns[Math.floor(Math.random() * patterns.length)];
-
-    container.innerHTML = `
-        <div style="text-align:center; color:white;">
-            <h3 style="color:#94a3b8;">Tertiary: Syntax & Logic</h3>
-            <p>Write a string that matches this <strong>RegEx</strong> pattern:</p>
-            <code style="display:block; font-size:1.5rem; background:#1e293b; padding:1rem; margin:1rem; border-radius:0.5rem; color:#f472b6;">${challenge.pattern.toString()}</code>
-            <p style="font-size:0.9rem; color:#94a3b8;">Task: ${challenge.desc}</p>
-            
-            <input type="text" id="regex-input" placeholder="Type test string..." autocomplete="off" 
-                style="padding:1rem; font-size:1.2rem; text-align:center; border-radius:0.5rem; border:none; width:300px;">
-            
-            <br><br>
-            <button id="check-regex" class="play-btn" style="width:auto;">Test Pattern</button>
-            <p id="regex-feedback" style="margin-top:1rem; height:20px; font-weight:bold;"></p>
-        </div>
-    `;
-
-    document.getElementById('check-regex').addEventListener('click', () => {
-        const val = document.getElementById('regex-input').value;
-        const feedback = document.getElementById('regex-feedback');
-        
-        if (challenge.pattern.test(val)) {
-            feedback.textContent = "Match Success! Syntax Valid.";
-            feedback.style.color = "#4ade80";
-            updateUserXP(50);
-            unlockNextLevel(gameLevel);
-            setTimeout(() => switchView('view-levels'), 1500);
-        } else {
-            feedback.textContent = "Pattern mismatch. Check syntax.";
-            feedback.style.color = "#f87171";
-        }
-    });
 }
 
 /* Snake Game Implementation */
 function startSnakeGame(container, levelText, topic, gameLevel, subject) {
     // Setup Canvas
-    container.innerHTML = `
+   container.innerHTML = `
         <div style="text-align:center; color:white;">
             <div style="display:flex; justify-content:space-between; width:400px; margin:0 auto 5px auto;">
                 <span style="color:#4ade80; font-weight:bold;">Level ${gameLevel}</span>
@@ -801,6 +554,7 @@ function startSnakeGame(container, levelText, topic, gameLevel, subject) {
     let isGameOver = false;
 
     // Stats Tracking
+    let currentSubjectId = subject.id;
     let sessionStats = { correct: [], incorrect: [], rule: "" };
 
     // Controls Listeners
@@ -828,7 +582,7 @@ function startSnakeGame(container, levelText, topic, gameLevel, subject) {
         let ruleText = "";
 
         // Determine Content based on Subject
-        if (subject && ['math', 'acc', 'compsci', 'eng'].includes(subject.id)) {
+        if (currentSubjectId === 'math') {
             // Math Logic
             const mode = Math.random();
             if (mode < 0.33) {
@@ -848,7 +602,17 @@ function startSnakeGame(container, levelText, topic, gameLevel, subject) {
                 for(let i=0; i<5; i++) correctPool.push(isEven ? (Math.floor(Math.random()*20)*2) : (Math.floor(Math.random()*20)*2)+1);
                 for(let i=0; i<5; i++) wrongPool.push(isEven ? (Math.floor(Math.random()*20)*2)+1 : (Math.floor(Math.random()*20)*2));
             }
-        } else {
+        } else if (currentSubjectId === 'english') {
+             // English Logic (Words)
+            const cleanTopic = topic.toUpperCase().replace(/[^A-Z]/g, '') || "WORD";
+            const isTopicMode = Math.random() > 0.5 && cleanTopic.length > 2;
+
+             ruleText = `Eat letters in "${cleanTopic.substring(0, 6)}..."`;
+             const targets = cleanTopic.split('');
+             const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split('');
+             for (let i = 0; i < 5; i++) correctPool.push(targets[Math.floor(Math.random() * targets.length)]);
+             for (let i = 0; i < 5; i++) wrongPool.push(alphabet.filter(c => !targets.includes(c))[Math.floor(Math.random() * 20)]);
+        } else if (currentSubjectId === 'science'){
             // Text Logic (Letters)
             const cleanTopic = topic.toUpperCase().replace(/[^A-Z]/g, '') || "SCHOOL";
             const isTopicMode = Math.random() > 0.5 && cleanTopic.length > 2;
@@ -867,6 +631,8 @@ function startSnakeGame(container, levelText, topic, gameLevel, subject) {
                 for(let i=0; i<5; i++) correctPool.push(isVowel ? vowels[Math.floor(Math.random()*5)] : consonants[Math.floor(Math.random()*21)]);
                 for(let i=0; i<5; i++) wrongPool.push(isVowel ? consonants[Math.floor(Math.random()*21)] : vowels[Math.floor(Math.random()*5)]);
             }
+        } else {
+            ruleText = "Eat anything";
         }
 
         missionEl.textContent = ruleText;
@@ -1040,6 +806,9 @@ function startSnakeGame(container, levelText, topic, gameLevel, subject) {
 
         summaryEl.innerHTML = html;
         summaryEl.classList.remove('hidden');
+
+        // Only adds score to the user's profile if he finishes the game
+        if(isGameOver)  updateUserXP(score);
         restartBtn.classList.remove('hidden');
         
         if (isPass) {
@@ -1578,8 +1347,7 @@ function switchView(viewId) {
 }
 
 function getTier(levelText) {
-    if (['Grade R', 'Grade 1', 'Grade 2', 'Grade 3'].some(g => levelText.includes(g))) return 'foundation';
-    if (['Grade 4', 'Grade 5', 'Grade 6'].some(g => levelText.includes(g))) return 'intermediate';
+    if (['Grade 4', 'Grade 5', 'Grade 6'].some(g => levelText.includes(g))) return 'foundation';
     if (['Grade 7', 'Grade 8', 'Grade 9', 'Grade 10', 'Grade 11', 'Grade 12'].some(g => levelText.includes(g))) return 'highschool';
     return 'tertiary';
 }
