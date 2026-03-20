@@ -64,12 +64,15 @@ export function startPatternGame(container, level, onWin, onExit) {
             userAnswer = start * ratio * ratio * ratio * ratio;
         } else {
             // --- Type C: Simple Equation ---
-            const a = Math.floor(Math.random() * 5) + 1;
-            const b = Math.floor(Math.random() * 10) + 1;
-            currentPattern = [`${a}x + ${b}`];
-            userAnswer = 'Evaluate the expression';
-        }
+             const a = Math.floor(Math.random() * 5) + 1; // Coefficient of x
+             const b = Math.floor(Math.random() * 10) + 1; // Constant term
+             const result = Math.floor(Math.random() * 20) + 1; // Result of the equation
+             currentPattern = [`${a}x + ${b} = ${result}`];
+             userAnswer = (result - b) / a;
+            userAnswer = parseFloat(userAnswer.toFixed(2)); // Round to 2 decimal places
 
+        }
+        
         patternDisplay.textContent = currentPattern.join(', ');
     }
 
@@ -77,7 +80,7 @@ export function startPatternGame(container, level, onWin, onExit) {
         const inputValue = answerInput.value.trim();
 
         if (inputValue === String(userAnswer)) {
-            score += 20;
+            score += 20;            
             scoreEl.textContent = `Score: ${score}`;
             feedbackEl.innerHTML = `<span style="color:#4ade80">Correct!</span>`;
 
@@ -120,6 +123,7 @@ export function startPatternGame(container, level, onWin, onExit) {
     // Start first round
     generatePattern();
 }
+
 
 /*
  *How to integrate it to gamefication.js
